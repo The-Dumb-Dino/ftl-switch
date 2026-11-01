@@ -76,7 +76,7 @@ OpenGL backend.
 
 Ryujinx is more forgiving than a console: it doesn't enforce memory permissions
 of the `.nro`'s segments, nor the GPU driver's memory limits. A build that runs
-there can still crash on a console; see [internals.md](internals.md#relocations-and-read-only-memory).
+there can still crash on a console; see [how-it-works.md](../how-it-works.md#relocations-and-read-only-memory).
 
 Logs reach Ryujinx's own log (as `OutputDebugString`), and the `screenshot`
 file (see [playing.md](playing.md#problems)) works there too.

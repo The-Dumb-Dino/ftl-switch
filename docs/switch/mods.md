@@ -76,6 +76,13 @@ one patched on the console.
 
 ## Hyperspace
 
+Hyperspace hooks the game's code at fixed addresses, so it's built for one
+game binary. The Android app, this Switch port and the ARM Linux version all
+run the same one, FTL for iPad 1.6.21, so they share one Hyperspace: the
+[`iOS-binary-ports`](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino/tree/iOS-binary-ports)
+branch of FTL-Hyperspace-Dino. The PC versions of FTL are different binaries
+and use the regular Hyperspace releases.
+
 `ftl.nro` built with Hyperspace (the default when `hyperspace/build-switch.sh`
 has run, see [building.md](building.md)) starts it whenever the applied mods
 include it: `Hyperspace.ftl` (from any
@@ -93,4 +100,4 @@ Memory: Hyperspace loads images lazily, on first use, which takes Multiverse
 from about 5.6 GB to about 1.4 GB, and a game's slot on the Switch has about
 3.2 GB. Start FTL with a game's memory (hold R, or a forwarder).
 
-How Hyperspace is built and hooked in on the Switch: [internals.md](internals.md#hyperspace).
+How Hyperspace is built and hooked in on the Switch: [how-it-works.md](../how-it-works.md#hyperspace).

@@ -5,7 +5,7 @@
 # The iPad game's Hyperspace (the fork and commit in source.sh), whose buildscripts/switch/
 # builds the HS_IPAD_SWITCH target (static, no vcpkg) with code memory from the host:
 # Horizon never makes code writable, so Hyperspace's hooks are written through the
-# port's second, writable view of the game's code (see docs/switch/internals.md).
+# port's second, writable view of the game's code (see docs/how-it-works.md).
 # HS_REPO and HS_REF pick another clone, branch or commit.
 # Needs: switch/setup.sh, libcxx/build.sh switch, hyperspace/build-tools.sh (run here).
 set -euo pipefail
