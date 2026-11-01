@@ -1,25 +1,31 @@
 # ftl-switch
 
-`ftl.nro` runs your own copy of **FTL: Faster Than Light for iPad** (1.6.21) on
-a **Nintendo Switch** with Atmosphère, as homebrew.
+This project runs a copy of the iPad version of **FTL: Faster Than Light** on a **Nintendo Switch 1** with Atmosphère custom firmware installed.
 
-It runs the real iOS game, unmodified: a Mach-O loader, an Objective-C runtime
+This runs the real iOS game, unmodified: a Mach-O loader, an Objective-C runtime
 and just enough of the iOS frameworks underneath it, on top of libnx. The
 touchscreen works as on the iPad, Joy-Cons and the Pro Controller drive a
 cursor, mods are applied on the console with ftlman's engine, and Hyperspace
 (Multiverse and other big mods) is built in.
 
-**Nothing of the game is in this repository**: you copy your own `.ipa` to the
+**Nothing of the game is in this repository**: You are required to acquire your own `FTL.ipa` to put on the
 SD card.
 
 Tested on a Switch with Atmosphère (firmware 22.1.0): the game, saves, touch
-and Joy-Cons, mods applied on the console, Hyperspace, and Multiverse with The
-Renegade Collection.
+and Joy-Cons, mods applied on the console, Hyperspace, and Multiverse with TRC.
 
-This project is based on [ftl-android](https://github.com/Sidd065/ftl-android)
+This project is derived from [ftl-android](https://github.com/Sidd065/ftl-android)
 by Sidd065, whose loader, Objective-C runtime and iOS frameworks it runs on.
 It has been reworked extensively and none of ftl-android's Android code is
 left; see [CREDITS.md](CREDITS.md) for what came from there and what's new.
+
+## Disclaimer
+
+This project has been assisted by AI, which some people may not view too positively. I am therefore letting you know now, so that you can step back if you would prefer to stay away from such projects.
+I would like to clarify that this is not my first FTL-related project. Please check out my profile. I am by no means inexperienced and have achieved a bunch of great things without any use of AI.
+
+One of my fellow developer friends said something pretty fitting: 
+***If a craftsman gets access to a new tool and their work gets worse, the tool is not to blame***
 
 ## Quick start
 
