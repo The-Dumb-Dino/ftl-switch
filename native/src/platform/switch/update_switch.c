@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+#include <time.h>
 
 #include "../linux/linux_app.h"
 #include "port_log.h"
@@ -180,9 +181,10 @@ static CURL *session(const char *url) {
     return c;
 }
 
-static bool latest_release(release *r, char *err, size_t errn) {
+// 1: the latest release is in r; 0: the repository has none (or is gone); -1: error
+static int latest_release(release *r, char *err, size_t errn) {
     CURL *c = session("https://api.github.com/repos/" FTL_SWITCH_UPDATE_REPO "/releases/latest");
-    if (!c) return false;
+    if (!c) return -1;
     struct curl_slist *h = curl_slist_append(NULL, "Accept: application/vnd.github+json");
     buffer b = {0};
     curl_easy_setopt(c, CURLOPT_HTTPHEADER, h);
@@ -190,13 +192,16 @@ static bool latest_release(release *r, char *err, size_t errn) {
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, to_buffer);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, &b);
     CURLcode rc = curl_easy_perform(c);
-    bool ok = rc == CURLE_OK && b.data && parse_release(b.data, b.len, r);
-    if (rc != CURLE_OK) snprintf(err, errn, "%s", curl_easy_strerror(rc));
-    else if (!ok) snprintf(err, errn, "unexpected answer from GitHub");
+    long status = 0;
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &status);
+    int got = rc == CURLE_OK && b.data && parse_release(b.data, b.len, r) ? 1 : -1;
+    if (rc == CURLE_HTTP_RETURNED_ERROR && status == 404) got = 0;
+    else if (rc != CURLE_OK) snprintf(err, errn, "%s", curl_easy_strerror(rc));
+    else if (got < 0) snprintf(err, errn, "unexpected answer from GitHub");
     free(b.data);
     curl_slist_free_all(h);
     curl_easy_cleanup(c);
-    return ok;
+    return got;
 }
 
 typedef struct {
@@ -283,18 +288,29 @@ static bool fetch(const release *r, const char *path, char *err, size_t errn) {
 
 // ---- the console ----------------------------------------------------------------
 
-static u64 wait_button(u64 mask) {
+// Waits for one of the buttons in mask; 0 when the app is closed or after
+// seconds (0: no limit)
+static u64 wait_button(u64 mask, int seconds) {
     PadState pad;
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
     padUpdate(&pad);  // buttons already held don't count
-    while (appletMainLoop()) {
+    u64 end = armGetSystemTick() + armNsToTicks((u64)seconds * 1000000000ULL);
+    while (appletMainLoop() && (!seconds || armGetSystemTick() < end)) {
         padUpdate(&pad);
         u64 down = padGetButtonsDown(&pad) & mask;
         if (down) return down;
         consoleUpdate(NULL);
     }
     return 0;
+}
+
+// A clock far off makes every certificate look expired or not yet valid
+static int clock_off_year(void) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    int year = t ? t->tm_year + 1900 : 0, built = atoi(&__DATE__[7]);
+    return year < built || year > built + 10 ? year : 0;
 }
 
 static void skip_path(char *out, size_t n) { snprintf(out, n, "%s/update-skip", g_paths.config_dir); }
@@ -380,7 +396,21 @@ void switch_update_check(const char *argv0) {
 
     release r;
     char err[300] = "";
-    if (!latest_release(&r, err, sizeof err)) {
+    int got = latest_release(&r, err, sizeof err);
+    int year = got < 0 ? clock_off_year() : 0;
+    if (got == 0) {
+        LOGI("update: " FTL_SWITCH_UPDATE_REPO " has no releases");
+    } else if (got < 0 && year) {
+        // The one failure the player can fix: say so and give time to read it
+        LOGW("update: no answer from GitHub (%s), the clock says %d", err, year);
+        printf("\nCouldn't look for updates: %s\n"
+               "The Switch's clock says %d. Set the date and time in the\n"
+               "System Settings, then GitHub's certificate checks out.\n"
+               "\nPress A to go on (starts by itself in 15 seconds).\n", err, year);
+        consoleUpdate(NULL);
+        wait_button(HidNpadButton_A, 15);
+        printf("\n");
+    } else if (got < 0) {
         LOGW("update: no answer from GitHub (%s)", err);
         printf("  (couldn't check: %s)\n", err);
     } else if (!newer(r.tag, FTL_SWITCH_VERSION)) {
@@ -401,7 +431,7 @@ void switch_update_check(const char *argv0) {
                "  X  Skip this version\n",
                r.tag, FTL_SWITCH_VERSION);
         consoleUpdate(NULL);
-        u64 b = wait_button(HidNpadButton_A | HidNpadButton_B | HidNpadButton_X);
+        u64 b = wait_button(HidNpadButton_A | HidNpadButton_B | HidNpadButton_X, 0);
         if (b & HidNpadButton_X) {
             skip_version(r.tag);
             printf("\nSkipped %s.\n\n", r.tag);
@@ -419,7 +449,7 @@ void switch_update_check(const char *argv0) {
                 printf("\nThe update failed: %s\n"
                        "This version starts instead. Press A to go on.\n", err);
                 consoleUpdate(NULL);
-                wait_button(HidNpadButton_A);
+                wait_button(HidNpadButton_A, 0);
             }
         } else {
             printf("\n");

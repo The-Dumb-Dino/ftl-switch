@@ -81,6 +81,8 @@ is online. When there is one, the start screen asks:
 A downloads it, checks it and puts it in place of `ftl.nro`, then starts the new
 version. If anything goes wrong, the old `ftl.nro` stays and starts instead. X
 writes the version to `update-skip`; delete that file to be asked again.
+The check needs the Switch's date and time to be right: with the clock far off,
+GitHub's certificate looks expired and the start screen says so.
 `check_updates = false` turns the check off. Builds you make yourself don't
 check.
 
