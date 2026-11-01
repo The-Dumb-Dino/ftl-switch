@@ -2,8 +2,8 @@
 // /switch/ftl/mods/, applied with ftlman itself (its patch engine, built for the
 // Switch and linked in: switch/rust/). The original ftl.dat stays as
 // ftl.dat.vanilla, which every patch starts from. ftl.nro applies the mods that are
-// on at startup whenever they changed; ftlman.nro (the mod manager) switches them
-// on and off, orders and applies them. Then mods_prepare (mods_linux.c) sees the
+// on at startup whenever they changed; the mod list (switch_mods_menu, L on the start
+// screen) switches them on and off and orders them. Then mods_prepare (mods_linux.c) sees the
 // new ftl.dat, makes the image overlay and, with Hyperspace among them, the game
 // starts with it.
 #include <dirent.h>
@@ -22,8 +22,13 @@
 #include "switch_app.h"
 #include "switch_mods.h"
 
-int ftlman_patch(const char *data_dir, const char *const *mods, size_t n, void (*log)(int level, const char *msg),
-                 char *err, size_t errlen);
+// memory: bytes ftlman may use to patch a copy of ftl.dat in memory (switch/rust/, ftlman/switch.patch)
+int ftlman_patch(const char *data_dir, const char *const *mods, size_t n, size_t memory,
+                 void (*log)(int level, const char *msg), char *err, size_t errlen);
+
+// Kept free while ftlman patches in memory: its XML and Lua work, the mods' zip
+// reading and the console
+#define PATCH_RESERVE_MB 384
 
 static bool is_mod(const char *dir, const char *name) {
     if (name[0] == '.') return false;
@@ -198,7 +203,11 @@ static struct {
 // ftlman on its own thread: its XML and Lua work wants more stack than the main thread has.
 static void *patch_thread(void *p) {
     (void)p;
-    g_job.rc = ftlman_patch(g_paths.game_dir, g_job.paths, (size_t)g_job.n, ftlman_log, g_job.err, sizeof g_job.err);
+    long free_mb, total_mb, used_mb;
+    port_memory(&free_mb, &total_mb, &used_mb);
+    size_t memory = free_mb > PATCH_RESERVE_MB ? (size_t)(free_mb - PATCH_RESERVE_MB) << 20 : 0;
+    g_job.rc = ftlman_patch(g_paths.game_dir, g_job.paths, (size_t)g_job.n, memory, ftlman_log, g_job.err,
+                            sizeof g_job.err);
     return NULL;
 }
 
@@ -252,7 +261,7 @@ int switch_mods_apply(const switch_mod *mods, int n, void (*print)(const char *l
         if (pthread_create(&th, &a, patch_thread, NULL) == 0) pthread_join(th, NULL);
         else snprintf(g_job.err, sizeof g_job.err, "couldn't start ftlman");
         if (g_job.rc != 0) {
-            // ftlman patches ftl.dat in place: put the original back rather than leave half a patch
+            // ftlman may have patched ftl.dat in place: put the original back rather than leave half a patch
             restore_vanilla();
             LOGE("mods: %s", g_job.err);
             snprintf(err, (size_t)errlen, "%s", g_job.err[0] ? g_job.err : "(see logs/)");
@@ -266,13 +275,94 @@ int switch_mods_apply(const switch_mod *mods, int n, void (*print)(const char *l
     return 0;
 }
 
-int switch_mods_original(switch_mod *mods, int n, char *err, int errlen) {
-    for (int i = 0; i < n; i++) mods[i].on = false;
-    if (switch_mods_save(mods, n) != 0) {
-        snprintf(err, (size_t)errlen, "Couldn't write mods/order.txt.");
-        return -1;
+// ---- the mod list (L on the start screen) ------------------------------------
+
+#define MENU_ROWS 30  // mods shown at once; libnx's console is 80x45
+
+static void menu_draw(const switch_mod *mods, int n, int sel, int top, const char *note) {
+    char dir[600], p[900];
+    mods_dir(dir, sizeof dir);
+    printf("\x1b[2J\x1b[H");  // clear, home
+    printf("FTL mods  (/switch/ftl/mods/)\n\n");
+    if (n == 0) printf("  No mods yet: put .ftl or .zip files in /switch/ftl/mods/.\n");
+    for (int i = top; i < n && i < top + MENU_ROWS; i++) {
+        snprintf(p, sizeof p, "%s/%s", dir, mods[i].name);
+        struct stat st;
+        char size[16] = "";
+        if (stat(p, &st) == 0 && S_ISREG(st.st_mode)) snprintf(size, sizeof size, "%5.1f MB", st.st_size / 1048576.0);
+        printf("%s%3d [%c] %-56.56s %s\n", i == sel ? ">" : " ", i + 1, mods[i].on ? 'x' : ' ', mods[i].name, size);
     }
-    return switch_mods_apply(mods, n, NULL, err, errlen);
+    if (n > MENU_ROWS) printf("      (%d-%d of %d)\n", top + 1, top + MENU_ROWS < n ? top + MENU_ROWS : n, n);
+    int on = count_on(mods, n);
+    printf("\n%d of %d on%s\n\n", on, n, on == 0 ? ": the original game" : "");
+    printf("  Up/Down  choose            A  on/off\n"
+           "  L / R    move up / down    -  all off (the original game)\n"
+           "  +        save and start    B  start without changes\n");
+    if (note) printf("\n%s\n", note);
+    consoleUpdate(NULL);
+}
+
+bool switch_mods_menu(void) {
+    static switch_mod mods[SWITCH_MAX_MODS];
+    int n = switch_mods_list(mods, SWITCH_MAX_MODS);
+    LOGI("mods: the mod list (%d mods)", n);
+    PadState pad;
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+    padInitializeDefault(&pad);
+    padUpdate(&pad);  // L, held to get here, doesn't count
+    int sel = 0, top = 0;
+    bool dirty = false;
+    const char *note = NULL;
+    menu_draw(mods, n, sel, top, note);
+    while (appletMainLoop()) {
+        padUpdate(&pad);
+        u64 down = padGetButtonsDown(&pad);
+        if (!down) {
+            consoleUpdate(NULL);
+            continue;
+        }
+        note = NULL;
+        // Hyperspace stays first: the mods that build on it expect its files before theirs
+        bool hs_first = n > 0 && is_hyperspace(mods[0].name);
+        if (down & (HidNpadButton_Up | HidNpadButton_StickLUp)) {
+            sel = sel > 0 ? sel - 1 : (n ? n - 1 : 0);
+        } else if (down & (HidNpadButton_Down | HidNpadButton_StickLDown)) {
+            sel = sel < n - 1 ? sel + 1 : 0;
+        } else if ((down & HidNpadButton_A) && n) {
+            mods[sel].on = !mods[sel].on;
+            dirty = true;
+        } else if ((down & (HidNpadButton_L | HidNpadButton_R)) && n) {
+            int to = sel + ((down & HidNpadButton_L) ? -1 : 1);
+            if (hs_first && (sel == 0 || to == 0)) {
+                note = "Hyperspace stays first: the mods that need it build on its files.";
+            } else if (to >= 0 && to < n) {
+                switch_mod t = mods[sel];
+                mods[sel] = mods[to];
+                mods[to] = t;
+                sel = to;
+                dirty = true;
+            }
+        } else if (down & HidNpadButton_Minus) {
+            for (int i = 0; i < n; i++) mods[i].on = false;
+            dirty = true;
+        } else if (down & HidNpadButton_Plus) {
+            if (!dirty) break;
+            if (switch_mods_save(mods, n) == 0) {
+                LOGI("mods: %d of %d on, saved to mods/order.txt", count_on(mods, n), n);
+                break;
+            }
+            note = "Couldn't write mods/order.txt: is the SD card full or read-only?";
+        } else if (down & HidNpadButton_B) {
+            dirty = false;
+            break;
+        }
+        if (sel < top) top = sel;
+        if (sel >= top + MENU_ROWS) top = sel - MENU_ROWS + 1;
+        menu_draw(mods, n, sel, top, note);
+    }
+    printf("\x1b[2J\x1b[H");
+    consoleUpdate(NULL);
+    return dirty;
 }
 
 // ftl.nro at startup: applies the mods that are on when they changed since last time.
@@ -292,8 +382,8 @@ int mods_switch_apply(void (*console_on)(void)) {
     if (switch_mods_apply(mods, n, console_print, err, sizeof err) != 0) {
         char msg[1400];
         snprintf(msg, sizeof msg,
-                 "The mods couldn't be applied:\n%s\n\nPlaying without them. Switch the mod off in the mod manager "
-                 "(ftlman.nro) or remove it, and start FTL again.",
+                 "The mods couldn't be applied:\n%s\n\nPlaying without them. Switch the mod off in the mod list "
+                 "(L on the start screen) or remove it, and start FTL again.",
                  err);
         switch_show_error(msg);
         return -1;

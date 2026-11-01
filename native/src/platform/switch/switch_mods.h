@@ -1,6 +1,5 @@
-// Mods on the console (mods_switch.c), shared by ftl.nro (applies changed mods at
-// startup) and ftlman.nro (the mod manager: switch mods on/off, order, apply,
-// back to the original game).
+// Mods on the console (mods_switch.c): ftl.nro applies changed mods at startup,
+// and its mod list (L on the start screen) switches them on/off and orders them.
 #pragma once
 #include <stdbool.h>
 
@@ -25,5 +24,6 @@ int switch_mods_save(const switch_mod *mods, int n);
 int switch_mods_apply(const switch_mod *mods, int n, void (*print)(const char *line), char *err, int errlen);
 // Whether the mods that are on differ from what was applied last.
 bool switch_mods_changed(const switch_mod *mods, int n);
-// Puts the original ftl.dat back and switches every mod off. 0 on success.
-int switch_mods_original(switch_mod *mods, int n, char *err, int errlen);
+// The mod list on the console: on/off, order, all off; saves mods/order.txt.
+// Returns whether anything changed (startup then applies it as usual).
+bool switch_mods_menu(void);

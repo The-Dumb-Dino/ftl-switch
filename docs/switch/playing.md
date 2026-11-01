@@ -107,5 +107,9 @@ The Renegade Collection (patched on the console, and on a PC).
   button: homebrew has no system dialog with choices.
 - The drawing size is picked at start (1080p docked, 720p handheld); switching
   modes while playing leaves the console to scale.
-- Applying big mods on the console is slow (Multiverse with addons: 20 minutes
-  or more). Patching on a PC is faster: see [mods.md](mods.md#big-mods-patch-on-a-pc).
+- Mods are switched on and off in the mod list: press L when the start screen
+  offers it (see
+  [mods.md](mods.md#the-mod-list)).
+- Applying big mods on the console takes a while; without enough memory to do
+  it in memory (started from the Album), Multiverse with addons takes 20 minutes
+  or more. Patching on a PC is faster: see [mods.md](mods.md#big-mods-patch-on-a-pc).

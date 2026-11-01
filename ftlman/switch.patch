@@ -1,6 +1,8 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 0b6cf2b..b44acad 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -6,9 +6,19 @@
+@@ -6,9 +6,19 @@ edition = "2024"
  [features]
  default = ["gui"]
  # The mod manager window. Without it ftlman is command-line only (e.g. in ftl.nro).
@@ -21,7 +23,7 @@
  [dependencies]
  env_logger = "0.11"
  log = "0.4"
-@@ -70,7 +80,7 @@
+@@ -70,7 +80,7 @@ semver = { version = "1", features = ["serde"] }
  jiff = { version = "0.2" }
  
  # This dependency could be removed but it's pretty small.
@@ -30,7 +32,7 @@
  
  mlua = { version = "0.10", features = ["lua54", "macros", "vendored", "error-send", "serialize"] }
  gc-arena = "0.5.3"
-@@ -104,6 +114,11 @@
+@@ -104,6 +114,11 @@ strip = false
  debug = true
  
  [patch.crates-io]
@@ -42,6 +44,360 @@
  egui = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
  eframe = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
  epaint = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
+diff --git a/src/apply/mod.rs b/src/apply/mod.rs
+index 0656872..af798a9 100644
+--- a/src/apply/mod.rs
++++ b/src/apply/mod.rs
+@@ -506,10 +506,202 @@ impl VirtualFileTree {
+     }
+ }
+ 
+-pub struct LuaPkgFS<'a>(&'a mut Pkg<File>, pub VirtualFileTree);
++/// ftl.dat while it's patched: the file itself, or (ftl.nro) a copy in memory that
++/// is written out once at the end, since small reads and writes on the Switch's SD
++/// card are slow.
++pub enum DatStorage {
++    Disk(File),
++    Memory(MemoryDat),
++}
++
++/// ftl.dat in memory, in 16 MB pieces: no single huge allocation (the Switch can't
++/// always give one even with the memory free) and nothing copied as it grows.
++/// Running out of memory is an io::Error (kind OutOfMemory) instead of an abort,
++/// so the caller can patch on disk instead.
++pub struct MemoryDat {
++    chunks: Vec<Box<[u8]>>,
++    len: u64,
++    pos: u64,
++}
++
++const CHUNK: usize = 16 << 20;
++
++fn out_of_memory() -> std::io::Error {
++    std::io::Error::new(std::io::ErrorKind::OutOfMemory, "not enough memory for ftl.dat")
++}
++
++impl MemoryDat {
++    fn new() -> Self {
++        Self { chunks: Vec::new(), len: 0, pos: 0 }
++    }
++
++    /// Room for `len` bytes; new pieces are zeroed.
++    fn reserve_to(&mut self, len: u64) -> std::io::Result<()> {
++        while ((self.chunks.len() * CHUNK) as u64) < len {
++            let mut chunk = Vec::new();
++            chunk.try_reserve_exact(CHUNK).map_err(|_| out_of_memory())?;
++            chunk.resize(CHUNK, 0);
++            self.chunks.try_reserve(1).map_err(|_| out_of_memory())?;
++            self.chunks.push(chunk.into_boxed_slice());
++        }
++        Ok(())
++    }
++
++    /// The pieces in order, each cut to the data's length
++    fn slices(&self) -> impl Iterator<Item = &[u8]> {
++        let len = self.len as usize;
++        self.chunks
++            .iter()
++            .enumerate()
++            .take_while(move |(i, _)| i * CHUNK < len)
++            .map(move |(i, c)| &c[..(len - i * CHUNK).min(CHUNK)])
++    }
++
++    /// Reads a whole file in, piece by piece.
++    fn read_file(path: &Path) -> std::io::Result<Self> {
++        let mut file = File::open(path)?;
++        let mut dat = Self::new();
++        dat.reserve_to(file.metadata()?.len())?;
++        loop {
++            let at = dat.len as usize;
++            if at == dat.chunks.len() * CHUNK {
++                dat.reserve_to(at as u64 + 1)?;
++            }
++            let (c, o) = (at / CHUNK, at % CHUNK);
++            let n = file.read(&mut dat.chunks[c][o..])?;
++            if n == 0 {
++                return Ok(dat);
++            }
++            dat.len += n as u64;
++        }
++    }
++}
++
++impl Read for MemoryDat {
++    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
++        if self.pos >= self.len {
++            return Ok(0);
++        }
++        let at = self.pos as usize;
++        let (c, o) = (at / CHUNK, at % CHUNK);
++        let n = buf.len().min(CHUNK - o).min((self.len - self.pos) as usize);
++        buf[..n].copy_from_slice(&self.chunks[c][o..o + n]);
++        self.pos += n as u64;
++        Ok(n)
++    }
++}
++
++impl Write for MemoryDat {
++    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
++        let end = self.pos + buf.len() as u64;
++        self.reserve_to(end)?;
++        let mut done = 0;
++        while done < buf.len() {
++            let at = self.pos as usize + done;
++            let (c, o) = (at / CHUNK, at % CHUNK);
++            let n = (buf.len() - done).min(CHUNK - o);
++            self.chunks[c][o..o + n].copy_from_slice(&buf[done..done + n]);
++            done += n;
++        }
++        self.pos = end;
++        self.len = self.len.max(end);
++        Ok(buf.len())
++    }
++    fn flush(&mut self) -> std::io::Result<()> {
++        Ok(())
++    }
++}
++
++impl Seek for MemoryDat {
++    fn seek(&mut self, to: std::io::SeekFrom) -> std::io::Result<u64> {
++        let to = match to {
++            std::io::SeekFrom::Start(n) => n as i64,
++            std::io::SeekFrom::End(d) => self.len as i64 + d,
++            std::io::SeekFrom::Current(d) => self.pos as i64 + d,
++        };
++        if to < 0 {
++            return Err(std::io::ErrorKind::InvalidInput.into());
++        }
++        self.pos = to as u64;
++        Ok(self.pos)
++    }
++}
++
++impl silpkg::sync::Truncate for MemoryDat {
++    fn truncate(&mut self, len: u64) -> std::io::Result<()> {
++        if len < self.len {
++            // drop the pieces past the end and zero the rest of the last one, so a
++            // later write past the end finds zeros there, as a file would have
++            self.chunks.truncate((len as usize).div_ceil(CHUNK));
++            let o = len as usize % CHUNK;
++            if o != 0 {
++                self.chunks.last_mut().unwrap()[o..].fill(0);
++            }
++        } else {
++            self.reserve_to(len)?;
++        }
++        self.len = len;
++        Ok(())
++    }
++}
++
++macro_rules! dat_dispatch {
++    ($self:ident, $s:ident => $e:expr) => {
++        match $self {
++            DatStorage::Disk($s) => $e,
++            DatStorage::Memory($s) => $e,
++        }
++    };
++}
++impl Read for DatStorage {
++    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
++        dat_dispatch!(self, s => s.read(buf))
++    }
++}
++impl Write for DatStorage {
++    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
++        dat_dispatch!(self, s => s.write(buf))
++    }
++    fn flush(&mut self) -> std::io::Result<()> {
++        dat_dispatch!(self, s => s.flush())
++    }
++}
++impl Seek for DatStorage {
++    fn seek(&mut self, to: std::io::SeekFrom) -> std::io::Result<u64> {
++        dat_dispatch!(self, s => s.seek(to))
++    }
++}
++impl silpkg::sync::Truncate for DatStorage {
++    fn truncate(&mut self, len: u64) -> std::io::Result<()> {
++        dat_dispatch!(self, s => silpkg::sync::Truncate::truncate(s, len))
++    }
++}
++
++/// io::copy with 1 MB blocks instead of 8 KB: far fewer calls to the file system
++fn copy_big(reader: &mut dyn Read, writer: &mut dyn Write) -> std::io::Result<u64> {
++    let mut buf = vec![0u8; 1 << 20];
++    let mut total = 0;
++    loop {
++        let n = match reader.read(&mut buf) {
++            Ok(0) => return Ok(total),
++            Ok(n) => n,
++            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
++            Err(e) => return Err(e),
++        };
++        writer.write_all(&buf[..n])?;
++        total += n as u64;
++    }
++}
++
++/// std::fs::copy with 1 MB blocks
++fn copy_file(from: &Path, to: &Path) -> std::io::Result<u64> {
++    copy_big(&mut File::open(from)?, &mut File::create(to)?)
++}
++
++pub struct LuaPkgFS<'a>(&'a mut Pkg<DatStorage>, pub VirtualFileTree);
+ 
+ impl<'a> LuaPkgFS<'a> {
+-    pub fn new(pkg: &'a mut Pkg<File>) -> Result<Self> {
++    pub fn new(pkg: &'a mut Pkg<DatStorage>) -> Result<Self> {
+         let vft = VirtualFileTree::from_paths(pkg.paths()).context("Failed to create virtual file tree")?;
+ 
+         Ok(Self(pkg, vft))
+@@ -603,7 +795,7 @@ impl<S: Read + Seek> LuaFS for LuaZipFS<'_, S> {
+ }
+ 
+ fn make_lua_filesystems<'a, 'b>(
+-    pkg: &'a mut Pkg<File>,
++    pkg: &'a mut Pkg<DatStorage>,
+     mod_handle: &'b mut OpenModHandle,
+ ) -> Result<(LuaPkgFS<'a>, Box<dyn LuaFS + 'b>)> {
+     Ok((
+@@ -629,17 +821,50 @@ fn log_diagnostic_messages(messages: &[Group<'_>]) {
+ }
+ 
+ pub fn apply_ftl(
++    ftl_path: &Path,
++    mods: Vec<Mod>,
++    on_progress: impl FnMut(ApplyStage),
++    repack: bool,
++    diagnostics: Option<&mut Diagnostics<'_>>,
++    print_diagnostics: bool,
++) -> Result<()> {
++    apply_ftl_with(ftl_path, mods, on_progress, repack, diagnostics, print_diagnostics, None)
++}
++
++/// apply_ftl, patching a copy of ftl.dat in memory when `memory` is Some (the
++/// caller's estimate of what that takes, which it checked against what's free):
++/// read once, written once, which is much faster on slow storage (the Switch's SD
++/// card). When memory runs out on the way it fails with an io::Error of kind
++/// OutOfMemory and ftl.dat is as it was; patch on disk then (memory None).
++pub fn apply_ftl_with(
+     ftl_path: &Path,
+     mods: Vec<Mod>,
+     mut on_progress: impl FnMut(ApplyStage),
+     repack: bool,
+     mut diagnostics: Option<&mut Diagnostics<'_>>,
+     print_diagnostics: bool,
++    memory: Option<u64>,
+ ) -> Result<()> {
+     on_progress(ApplyStage::Preparing);
+ 
+-    let data_file = {
+-        const BACKUP_FILENAME: &str = "ftl.dat.vanilla";
++    const BACKUP_FILENAME: &str = "ftl.dat.vanilla";
++    let data_file = if memory.is_some() {
++        let vanilla_path = ftl_path.join(BACKUP_FILENAME);
++        let original_path = ftl_path.join("ftl.dat");
++        if !vanilla_path.try_exists().context("Failed to check dat backup existence")? {
++            // the first patch: what's there now is the original
++            std::fs::rename(&original_path, &vanilla_path).context("Failed to backup ftl.dat")?;
++        }
++        let started = Instant::now();
++        let dat = MemoryDat::read_file(&vanilla_path)
++            .with_context(|| format!("Failed to read {BACKUP_FILENAME} into memory"))?;
++        info!(
++            "Read {BACKUP_FILENAME} ({} MB) into memory in {:.1} s",
++            dat.len >> 20,
++            started.elapsed().as_secs_f32()
++        );
++        DatStorage::Memory(dat)
++    } else {
+         let vanilla_path = ftl_path.join(BACKUP_FILENAME);
+         let original_path = ftl_path.join("ftl.dat");
+ 
+@@ -647,17 +872,19 @@ pub fn apply_ftl(
+             .try_exists()
+             .context("Failed to check dat backup existence")?
+         {
+-            std::fs::copy(vanilla_path, &original_path)
++            copy_file(&vanilla_path, &original_path)
+                 .with_context(|| format!("Failed to copy {BACKUP_FILENAME} to ftl.dat"))?;
+         } else {
+-            std::fs::copy(&original_path, vanilla_path).context("Failed to backup ftl.dat")?;
++            copy_file(&original_path, &vanilla_path).context("Failed to backup ftl.dat")?;
+         }
+ 
+-        std::fs::OpenOptions::new()
+-            .read(true)
+-            .write(true)
+-            .open(original_path)
+-            .context("Failed to open ftl.dat")?
++        DatStorage::Disk(
++            std::fs::OpenOptions::new()
++                .read(true)
++                .write(true)
++                .open(original_path)
++                .context("Failed to open ftl.dat")?,
++        )
+     };
+ 
+     let lua = ModLuaRuntime::new().context("Failed to initiailize Lua runtime")?;
+@@ -901,7 +1128,7 @@ pub fn apply_ftl(
+                                 lower_paths_map.insert(name.to_lowercase(), name.clone());
+                             })
+                     } else {
+-                        std::io::copy(&mut reader, &mut pkg.insert(name.clone(), INSERT_FLAGS)?).map(|_| ())
++                        copy_big(&mut reader, &mut pkg.insert(name.clone(), INSERT_FLAGS)?).map(|_| ())
+                     }
+                     .with_context(|| format!("Failed to insert {name} into ftl.dat"))?;
+                 }
+@@ -913,10 +1140,32 @@ pub fn apply_ftl(
+     trace!("Repacking");
+     if repack {
+         on_progress(ApplyStage::Repacking);
++        let started = Instant::now();
+         pkg.repack().context("Failed to repack ftl.dat")?;
++        info!("Repacked in {:.1} s", started.elapsed().as_secs_f32());
+     }
+     pkg.flush()?;
+ 
++    if let DatStorage::Memory(dat) = pkg.inner() {
++        let started = Instant::now();
++        let path = ftl_path.join("ftl.dat");
++        let mut out = File::create(&path).context("Failed to create ftl.dat")?;
++        // the whole size at once: the file system allocates it in one go rather
++        // than with every block written
++        out.set_len(dat.len).context("Failed to write ftl.dat")?;
++        for piece in dat.slices() {
++            for block in piece.chunks(4 << 20) {
++                out.write_all(block).context("Failed to write ftl.dat")?;
++            }
++        }
++        out.sync_all().context("Failed to write ftl.dat")?;
++        info!(
++            "Wrote ftl.dat ({} MB) in {:.1} s",
++            dat.len >> 20,
++            started.elapsed().as_secs_f32()
++        );
++    }
++
+     Ok(())
+ }
+ 
+diff --git a/src/bin_main.rs b/src/bin_main.rs
+new file mode 100644
+index 0000000..a90db52
+--- /dev/null
++++ b/src/bin_main.rs
+@@ -0,0 +1,6 @@
++#![feature(offset_of_enum)] // :)
++#![feature(iter_order_by)] // lazy
++// Without the window much of the shared code goes unused; that's expected.
++#![cfg_attr(not(feature = "gui"), allow(dead_code, unused_imports))]
++
++include!("main.rs");
+diff --git a/src/main.rs b/src/main.rs
+index b39df61..73ba95e 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -1,7 +1,4 @@
@@ -53,18 +409,104 @@
  
  use std::{
      borrow::Cow,
---- a/src/bin_main.rs
-+++ b/src/bin_main.rs
-@@ -0,0 +1,6 @@
-+#![feature(offset_of_enum)] // :)
-+#![feature(iter_order_by)] // lazy
-+// Without the window much of the shared code goes unused; that's expected.
-+#![cfg_attr(not(feature = "gui"), allow(dead_code, unused_imports))]
+@@ -2084,6 +2081,78 @@ pub enum ModSource {
+     InMemoryZip { filename: String, data: Vec<u8> },
+ }
+ 
++/// A read buffer (1 MB) that, unlike BufReader, keeps its data when a seek lands
++/// inside it: the zip reader jumps to every file's header, and files follow each
++/// other, so most jumps stay in the buffer. Reads of a buffer or more go direct.
++pub struct SeekBuf<R> {
++    inner: R,
++    buf: Vec<u8>,
++    start: u64,      // file offset of buf[0]
++    len: usize,      // valid bytes in buf
++    pos: u64,        // where the next read starts
++    inner_pos: u64,  // where inner is
++}
 +
-+include!("main.rs");
---- a/src/switch_lib.rs
++impl<R: Read + Seek> SeekBuf<R> {
++    pub fn new(inner: R) -> Self {
++        Self { inner, buf: vec![0; 1 << 20], start: 0, len: 0, pos: 0, inner_pos: 0 }
++    }
++
++    fn inner_to(&mut self, pos: u64) -> std::io::Result<()> {
++        if self.inner_pos != pos {
++            self.inner.seek(std::io::SeekFrom::Start(pos))?;
++            self.inner_pos = pos;
++        }
++        Ok(())
++    }
++}
++
++impl<R: Read + Seek> Read for SeekBuf<R> {
++    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
++        let end = self.start + self.len as u64;
++        if self.pos < self.start || self.pos >= end {
++            if out.len() >= self.buf.len() {
++                self.inner_to(self.pos)?;
++                let n = self.inner.read(out)?;
++                self.inner_pos += n as u64;
++                self.pos += n as u64;
++                return Ok(n);
++            }
++            self.inner_to(self.pos)?;
++            let n = self.inner.read(&mut self.buf)?;
++            self.inner_pos += n as u64;
++            self.start = self.pos;
++            self.len = n;
++            if n == 0 {
++                return Ok(0);
++            }
++        }
++        let at = (self.pos - self.start) as usize;
++        let n = out.len().min(self.len - at);
++        out[..n].copy_from_slice(&self.buf[at..at + n]);
++        self.pos += n as u64;
++        Ok(n)
++    }
++}
++
++impl<R: Read + Seek> Seek for SeekBuf<R> {
++    fn seek(&mut self, to: std::io::SeekFrom) -> std::io::Result<u64> {
++        self.pos = match to {
++            std::io::SeekFrom::Start(n) => n,
++            std::io::SeekFrom::Current(d) => self
++                .pos
++                .checked_add_signed(d)
++                .ok_or(std::io::Error::from(std::io::ErrorKind::InvalidInput))?,
++            std::io::SeekFrom::End(_) => {
++                let p = self.inner.seek(to)?;
++                self.inner_pos = p;
++                p
++            }
++        };
++        Ok(self.pos)
++    }
++}
++
+ pub trait ReadSeek: Read + Seek {}
+ impl<T: Read + Seek> ReadSeek for T {}
+ 
+@@ -2138,7 +2207,11 @@ impl ModSource {
+                 OpenModHandle::Directory { path: path.clone() }
+             }
+             Self::Zip { path } => OpenModHandle::Zip {
+-                archive: zip::ZipArchive::new(Box::new(std::fs::File::open(path)?) as Box<dyn ReadSeek + Send + Sync>)?,
++                // read in 1 MB blocks: unbuffered, the zip reader's many small reads are slow
++                // on some storage (the Switch's SD card)
++                archive: zip::ZipArchive::new(
++                    Box::new(SeekBuf::new(std::fs::File::open(path)?)) as Box<dyn ReadSeek + Send + Sync>
++                )?,
+             },
+             Self::InMemoryZip { data, .. } => OpenModHandle::Zip {
+                 archive: zip::ZipArchive::new(
+diff --git a/src/switch_lib.rs b/src/switch_lib.rs
+new file mode 100644
+index 0000000..9b93b33
+--- /dev/null
 +++ b/src/switch_lib.rs
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,176 @@
 +#![feature(offset_of_enum)]
 +#![feature(iter_order_by)]
 +#![allow(dead_code, unused_imports)]
@@ -102,15 +544,61 @@
 +        fn flush(&self) {}
 +    }
 +
++    /// At most how much memory patching in memory needs: ftl.dat.vanilla (or
++    /// ftl.dat before the first patch) and everything the mods hold unpacked.
++    fn memory_needed(data_dir: &std::path::Path, paths: &[PathBuf]) -> std::io::Result<u64> {
++        let vanilla = data_dir.join("ftl.dat.vanilla");
++        let dat = if vanilla.exists() { vanilla } else { data_dir.join("ftl.dat") };
++        let mut total = std::fs::metadata(dat)?.len();
++        for path in paths {
++            total += if path.is_dir() {
++                fn dir_size(p: &std::path::Path) -> std::io::Result<u64> {
++                    let mut n = 0;
++                    for e in std::fs::read_dir(p)? {
++                        let e = e?;
++                        let m = e.metadata()?;
++                        n += if m.is_dir() { dir_size(&e.path())? } else { m.len() };
++                    }
++                    Ok(n)
++                }
++                dir_size(path)?
++            } else {
++                // the sizes from the zip's directory alone: opening each file would
++                // read its header, all over the zip
++                let file = std::fs::File::open(path)?;
++                let packed = file.metadata()?.len();
++                let zip = zip::ZipArchive::new(crate::SeekBuf::new(file)).map_err(std::io::Error::other)?;
++                zip.decompressed_size().map_or(packed * 2, |n| n as u64)
++            };
++        }
++        // the result is smaller (replaced files, the repack): this only rules out
++        // what can't fit; the copy takes what it needs, in pieces
++        Ok(total + (64 << 20))
++    }
++
++    fn out_of_memory(e: &anyhow::Error) -> bool {
++        // silpkg's errors may not pass the io::Error on as a source: the message says it too
++        format!("{e:#}").contains("not enough memory for ftl.dat")
++            || e.chain().any(|c| {
++                c.downcast_ref::<std::io::Error>()
++                    .is_some_and(|io| io.kind() == std::io::ErrorKind::OutOfMemory)
++            })
++    }
++
 +    /// Patches data_dir/ftl.dat with the n mods (paths to .ftl/.zip files or
 +    /// folders), starting from data_dir/ftl.dat.vanilla (made on the first run), as
-+    /// `ftlman patch` does. log gets ftlman's messages; on failure the reason is
-+    /// written to err. Returns 0 on success.
++    /// `ftlman patch` does. With memory (bytes ftlman may use) for a copy of
++    /// ftl.dat and the mods, it patches that copy and writes ftl.dat once at the
++    /// end; otherwise, or when memory runs out on the way, it patches ftl.dat on
++    /// the SD card (slow). log gets
++    /// ftlman's messages; on failure the reason is written to err. Returns 0 on
++    /// success.
 +    #[unsafe(no_mangle)]
 +    pub extern "C" fn ftlman_patch(
 +        data_dir: *const c_char,
 +        mods: *const *const c_char,
 +        n: usize,
++        memory: usize,
 +        log: Option<LogFn>,
 +        err: *mut c_char,
 +        errlen: usize,
@@ -123,26 +611,61 @@
 +        }
 +        let cstr = |p: *const c_char| unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
 +        let data_dir = PathBuf::from(cstr(data_dir));
-+        let mods: Vec<Mod> = (0..n)
-+            .map(|i| {
-+                let path = PathBuf::from(cstr(unsafe { *mods.add(i) }));
-+                let source = if path.is_dir() { ModSource::Directory { path } } else { ModSource::Zip { path } };
-+                Mod::new_with_enabled(source, true)
-+            })
-+            .collect();
-+        let mut diagnostics = crate::validate::Diagnostics::new();
-+        let result = crate::apply::apply_ftl(
-+            &data_dir,
-+            mods,
-+            |stage| match stage {
-+                crate::apply::ApplyStage::Preparing => log::info!("Preparing..."),
-+                crate::apply::ApplyStage::Repacking => log::info!("Repacking..."),
-+                _ => {}
-+            },
-+            true,
-+            Some(&mut diagnostics),
-+            false,
-+        );
++        let paths: Vec<PathBuf> = (0..n).map(|i| PathBuf::from(cstr(unsafe { *mods.add(i) }))).collect();
++        let make_mods = || -> Vec<Mod> {
++            paths
++                .iter()
++                .map(|path| {
++                    let path = path.clone();
++                    let source = if path.is_dir() { ModSource::Directory { path } } else { ModSource::Zip { path } };
++                    Mod::new_with_enabled(source, true)
++                })
++                .collect()
++        };
++        let apply = |in_memory: Option<u64>| {
++            let mut diagnostics = crate::validate::Diagnostics::new();
++            crate::apply::apply_ftl_with(
++                &data_dir,
++                make_mods(),
++                |stage| match stage {
++                    crate::apply::ApplyStage::Preparing => log::info!("Preparing..."),
++                    crate::apply::ApplyStage::Repacking => log::info!("Repacking..."),
++                    _ => {}
++                },
++                // always: without the repack silpkg 0.1.4 leaves a broken path table when it
++                // had to grow it (it copies the table onto itself)
++                true,
++                Some(&mut diagnostics),
++                false,
++                in_memory,
++            )
++        };
++
++        let started = std::time::Instant::now();
++        let needed = memory_needed(&data_dir, &paths);
++        let result = match needed {
++            Ok(need) if need <= memory as u64 => {
++                log::info!("Patching in memory (up to {} MB of {} MB free)", need >> 20, memory >> 20);
++                match apply(Some(need)) {
++                    Err(e) if out_of_memory(&e) => {
++                        log::warn!("Ran out of memory ({e:#}): patching on the SD card instead");
++                        apply(None)
++                    }
++                    r => r,
++                }
++            }
++            Ok(need) => {
++                log::info!("Patching on the SD card (needs {} MB of memory, {} MB free)", need >> 20, memory >> 20);
++                apply(None)
++            }
++            Err(e) => {
++                log::warn!("Couldn't size the mods ({e}): patching on the SD card");
++                apply(None)
++            }
++        };
++        if result.is_ok() {
++            log::info!("Patched in {:.0} s", started.elapsed().as_secs_f32());
++        }
 +        match result {
 +            Ok(()) => 0,
 +            Err(e) => {

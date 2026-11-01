@@ -129,6 +129,19 @@ kept private in `ftl.nro` (one pre-linked object, `ftlman-private.o`, with only
 `ftl.dat` with the same `mods/` is taken as patched elsewhere (on a PC) and used
 as it is.
 
+Small reads and writes on the SD card are slow, and ftlman's archive library
+(silpkg) moves data in 8 KB pieces: Multiverse took 27 minutes patched in place,
+over half of it inserting files and repacking. So `ftlman_patch` patches a copy
+in memory when it can fit (at most `ftl.dat.vanilla` plus the mods unpacked;
+`mods_switch.c` keeps 384 MB of the free memory back): `ftl.dat.vanilla` is read
+and `ftl.dat` written once, in 4 MB blocks, with the same result byte for byte.
+The copy is kept in 16 MB pieces, since the Switch may not give one block of a
+gigabyte or two even with that much free. When it can't fit, or memory runs out
+on the way (reported as an error, not an abort), it patches the file on the SD
+card. Either way mod files are read and copied in 1 MB blocks, and ftl.dat is
+repacked: without it, silpkg 0.1.4 leaves a broken path table when it had to grow
+it (it copies the table onto itself).
+
 ## Hyperspace
 
 It's the same Hyperspace as for Android and Linux, the

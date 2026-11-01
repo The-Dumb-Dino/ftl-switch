@@ -18,6 +18,7 @@
 #include "../linux/linux_app.h"
 #include "port_log.h"
 #include "switch_app.h"
+#include "switch_mods.h"
 
 #ifndef FTL_SWITCH_VERSION
 #define FTL_SWITCH_VERSION "dev"
@@ -34,8 +35,36 @@ static void console_on(void) {
     if (g_console) return;
     consoleInit(NULL);
     g_console = g_console_used = true;
-    printf("FTL: Faster Than Light for Switch (homebrew port) %s\n\n", FTL_SWITCH_VERSION);
+    printf("FTL: Faster Than Light for Switch (homebrew port) %s\n", FTL_SWITCH_VERSION);
+    printf("\n");
 }
+
+#ifdef FTL_SWITCH_FTLMAN
+// Offers the mod list: waits a moment for L. A button held while the app starts
+// isn't reported to it (the log shows what was), so it's a press, not a hold.
+static bool mod_list_wanted(void) {
+    static switch_mod mods[SWITCH_MAX_MODS];
+    if (switch_mods_list(mods, SWITCH_MAX_MODS) == 0) return false;  // nothing to choose from
+    PadState pad;
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+    padInitializeDefault(&pad);
+    printf("Press L for the mod list...\n");
+    consoleUpdate(NULL);
+    u64 start = armGetSystemTick(), wait = armGetSystemTickFreq() * 3 / 2;  // 1.5 s
+    u64 seen = 0;
+    while (appletMainLoop() && armGetSystemTick() - start < wait) {
+        padUpdate(&pad);
+        u64 held = padGetButtons(&pad);
+        seen |= held;
+        if (held & HidNpadButton_L) return true;
+        consoleUpdate(NULL);
+        svcSleepThread(10000000);  // 10 ms
+    }
+    LOGI("start: no L for the mod list (buttons seen: %#llx, controller %s)", (unsigned long long)seen,
+         padIsConnected(&pad) ? "connected" : "not connected");
+    return false;
+}
+#endif
 // stdout/stderr once the console is closed: the kernel's debug output (shown by
 // debuggers and emulators), not the console, which they'd still point at otherwise.
 static ssize_t debug_write(struct _reent *r, void *fd, const char *ptr, size_t len) {
@@ -238,6 +267,7 @@ int main(int argc, char **argv) {
 #ifdef FTL_SWITCH_FTLMAN
     // Mods in /switch/ftl/mods/ are applied here with ftlman when that set changed (mods_switch.c)
     int mods_switch_apply(void (*console_on)(void));
+    if (!quiet && mod_list_wanted()) switch_mods_menu();
     mods_switch_apply(console_on);
 #endif
     // A ftl.dat patched with ftlman works as on Linux: the image overlay is made here.

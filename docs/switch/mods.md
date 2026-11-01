@@ -9,9 +9,15 @@ ftlman's own patch engine built into `ftl.nro` (the same results as ftlman on PC
 and Linux). Then the game starts with them.
 
 - Order: `Hyperspace.ftl` first, then the order in `mods/order.txt` if there is
-  one (one file name per line; mods it doesn't name follow by name), else by name.
+  one (one file name per line, `-name` for a mod that's off; mods it doesn't
+  name are on and follow by name), else by name.
 - Every patch starts from the original, kept as `game/ftl.dat.vanilla`. Taking
   all mods out of the folder puts the original back.
+- With enough free memory (FTL started with a game's memory, see
+  [playing.md](playing.md)) the patch happens in memory: `ftl.dat.vanilla` is
+  read once and the new `ftl.dat` written once, which is much faster than
+  patching the file on the SD card. With too little (started from the Album),
+  it patches on the SD card, which is slow for big mods.
 - If a mod can't be applied, FTL says why and plays without mods; fix or remove
   the mod and start again. ftlman's messages are in `logs/`.
 - After a change the game starts at the title screen (a run saved with other
@@ -22,11 +28,25 @@ and Linux). Then the game starts with them.
 Either way the port notices a changed `ftl.dat` at launch and makes the image
 overlay mods need.
 
+## The mod list
+
+When there are mods in `mods/`, FTL's start screen says "Press L for the mod
+list..." for a moment (a button held while FTL starts doesn't count: press it
+there). The list shows the mods and which are on:
+
+    Up/Down  choose            A  on/off
+    L / R    move up / down    -  all off (the original game)
+    +        save and start    B  start without changes
+
+`+` saves the choice to `mods/order.txt`, and FTL applies it right away when it
+changed. All off puts the original `ftl.dat` back (a copy, so it's quick), and
+the mods stay in the folder for later. Hyperspace stays first in the list.
+
 ## Big mods: patch on a PC
 
-Applying mods on the console is slow for big ones (Multiverse with addons takes
-20 minutes or more); ftlman on a PC does it in under a minute, and the console
-only needs the result:
+Applying big mods on the console takes a while, and on the SD card (too little
+memory for patching in memory) Multiverse with addons takes 20 minutes or more;
+ftlman on a PC does it in under a minute, and the console only needs the result:
 
 1. Copy the iPad game's original `ftl.dat` to a folder on the PC:
    `sdmc:/switch/ftl/game/ftl.dat.vanilla` if it's there (mods were applied on
