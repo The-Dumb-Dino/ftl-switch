@@ -19,6 +19,7 @@ by Sidd065, whose loader, Objective-C runtime and iOS frameworks it runs on.
 It has been reworked extensively and none of ftl-android's Android code is
 left; see [CREDITS.md](CREDITS.md) for what came from there and what's new.
 
+
 ## Disclaimer
 
 This project has been assisted by AI, which some people may not view too positively. I am therefore letting you know now, so that you can step back if you would prefer to stay away from such projects.
@@ -26,6 +27,7 @@ I would like to clarify that this is not my first FTL-related project. Please ch
 
 One of my fellow developer friends said something pretty fitting: 
 ***If a craftsman gets access to a new tool and their work gets worse, the tool is not to blame***
+
 
 ## Quick start
 
@@ -39,6 +41,18 @@ One of my fellow developer friends said something pretty fitting:
 
 To build `ftl.nro` yourself, see [docs/switch/building.md](docs/switch/building.md).
 
+
+## Supporting the project
+
+This is a hobby project done in my spare time. If you find it useful and want
+to say thanks, you can buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/DEINNAME)
+
+Donations are never expected; Bug reports, logs, and well-written issues are
+just as valuable.
+
+
 ## Documentation
 
 | | |
@@ -49,11 +63,13 @@ To build `ftl.nro` yourself, see [docs/switch/building.md](docs/switch/building.
 | [How it works](docs/how-it-works.md) | The loader, the runtime and frameworks under the game, code memory under Horizon, the toolchain, ftlman and Hyperspace in one `.nro` |
 | [Testing and debugging](docs/testing.md) | Logs, the headless test harness, debug switches, tools |
 
+
 ## Reporting bugs
 
 Please attach the session logs from `sdmc:/switch/ftl/logs/` (with Hyperspace,
 `zhl.log` and `FTL_HS.log` too), and say which mods were applied and how FTL
 was started (Homebrew Menu over a game, or a forwarder).
+
 
 ## License
 
