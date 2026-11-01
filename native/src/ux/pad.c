@@ -259,8 +259,7 @@ static void action(int act, bool down) {
         break;
     case ACT_PAUSE:
         if (down) {
-            int paused = ux_toggle_pause();
-            if (paused >= 0) overlay_flash(paused ? OVERLAY_ICON_PAUSE : OVERLAY_ICON_PLAY);
+            ux_toggle_pause();  // the game shows its own PAUSED label
         }
         break;
     case ACT_ZOOM_IN:
@@ -342,7 +341,7 @@ void ux_pad_connected(bool connected, const char *name) {
     release_all();
     pad_cursor_hide();
     // like on a console: a run stops when its controller goes
-    if (!ux_paused() && ux_toggle_pause() == 1) overlay_flash(OVERLAY_ICON_PAUSE);
+    if (!ux_paused()) ux_toggle_pause();
 }
 
 // K_* buttons / d-pad from a gamepad

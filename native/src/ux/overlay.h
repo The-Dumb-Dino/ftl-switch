@@ -2,10 +2,8 @@
 #pragma once
 #include <stdbool.h>
 
-enum { OVERLAY_ICON_PAUSE = 1, OVERLAY_ICON_PLAY };
 void overlay_draw(int sw, int sh, unsigned game_fbo, int gw, int gh);
 bool overlay_minimap_hit(float sx, float sy);   // main thread
-void overlay_flash(int icon);                   // main thread
 // Magnifier for the finger driving the game (main thread): phase 0 up, 1 down,
 // 2 move, 3 down and show at once (explicit request, ignores the setting).
 void overlay_loupe_touch(int phase, float sx, float sy);

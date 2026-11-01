@@ -24,7 +24,7 @@ static double now_s(void) {
 
 // ---- tiny rounded-rect renderer ---------------------------------------------------
 static GLuint g_prog, g_vao, g_vbo;
-static GLint u_rect, u_screen, u_radius, u_border, u_fill, u_stroke, u_shape;
+static GLint u_rect, u_screen, u_radius, u_border, u_fill, u_stroke;
 
 static const char *VS =
     "#version 300 es\n"
@@ -37,13 +37,10 @@ static const char *FS =
     "#version 300 es\n"
     "precision highp float;\n"  // u_rect is shared with the vertex shader: precisions must match
     "in vec2 v_px; uniform vec4 u_rect; uniform float u_radius; uniform float u_border;\n"
-    "uniform vec4 u_fill; uniform vec4 u_stroke; uniform int u_shape; out vec4 o;\n"
+    "uniform vec4 u_fill; uniform vec4 u_stroke; out vec4 o;\n"
     "float sdb(vec2 p, vec2 b, float r){ vec2 q = abs(p)-b+r; return length(max(q,0.0))+min(max(q.x,q.y),0.0)-r; }\n"
-    "float sdt(vec2 p, vec2 s){\n"  // triangle (0,0) (w,h/2) (0,h), pointing right
-    "  vec2 n1 = normalize(vec2(s.y*0.5, -s.x)), n2 = normalize(vec2(s.y*0.5, s.x));\n"
-    "  return max(-p.x, max(dot(p, n1), dot(p-vec2(0.0, s.y), n2))); }\n"
     "void main(){ vec2 h = u_rect.zw*0.5;\n"
-    "  float d = u_shape == 1 ? sdt(v_px, u_rect.zw) : sdb(v_px-h, h, u_radius);\n"
+    "  float d = sdb(v_px-h, h, u_radius);\n"
     "  float inside = clamp(0.5-d, 0.0, 1.0); float inner = clamp(0.5-(d+u_border), 0.0, 1.0);\n"
     "  vec4 c = mix(u_stroke, u_fill, inner); o = vec4(c.rgb, c.a*inside); }\n";
 
@@ -88,7 +85,6 @@ static bool init_gl(void) {
     u_border = glGetUniformLocation(g_prog, "u_border");
     u_fill = glGetUniformLocation(g_prog, "u_fill");
     u_stroke = glGetUniformLocation(g_prog, "u_stroke");
-    u_shape = glGetUniformLocation(g_prog, "u_shape");
     static const float quad[] = {0, 0, 1, 0, 0, 1, 1, 1};
     glGenVertexArrays(1, &g_vao);
     glGenBuffers(1, &g_vbo);
@@ -109,18 +105,10 @@ static void rrect(float x, float y, float w, float h, float r, float border, con
     glUniform4fv(u_stroke, 1, stroke);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
-static void triangle(float x, float y, float w, float h, const float fill[4]) {
-    const float none[4] = {0, 0, 0, 0};
-    glUniform1i(u_shape, 1);
-    rrect(x, y, w, h, 0, 0, fill, none);
-    glUniform1i(u_shape, 0);
-}
 
 // ---- state shared with the main thread ----------------------------------------------
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static float g_mm_x, g_mm_y, g_mm_w, g_mm_h;  // minimap rect (surface px), 0 when hidden
-static double g_flash_t;
-static int g_flash_icon;
 static bool g_minimap_on = true, g_minimap_hidden;
 static bool g_cursor_on;
 static float g_cursor_x, g_cursor_y;
@@ -193,25 +181,16 @@ void overlay_loupe_touch(int phase, float sx, float sy) {
     g_lp_y = sy;
     pthread_mutex_unlock(&g_lock);
 }
-void overlay_flash(int icon) {
-    pthread_mutex_lock(&g_lock);
-    g_flash_icon = icon;
-    g_flash_t = now_s();
-    pthread_mutex_unlock(&g_lock);
-}
 
 // ---- drawing ------------------------------------------------------------------------
 void overlay_draw(int sw, int sh, unsigned game_fbo, int gw, int gh) {
     double zoom = ux_current_zoom();
-    double ft, lt;
-    int ficon;
+    double lt;
     float lx, ly, cx_, cy_;
     bool show_loupe, show_cursor, forced;
     static bool loupe_was_shown;
     pthread_mutex_lock(&g_lock);
     double now = now_s();
-    ft = now - g_flash_t;
-    ficon = g_flash_icon;
     lt = now - g_lp_t0;
     lx = g_lp_x;
     ly = g_lp_y;
@@ -231,8 +210,7 @@ void overlay_draw(int sw, int sh, unsigned game_fbo, int gw, int gh) {
     if (show_loupe && !loupe_was_shown && !forced) ux_haptic(1);  // held long enough: the magnifier is up
     loupe_was_shown = show_loupe;
     bool show_mm = zoom > 1.01 && g_minimap_on && !g_minimap_hidden;
-    bool show_flash = ficon && ft < 0.6;
-    if (!show_mm && !show_flash && !show_loupe && !show_cursor && !ndebug) {
+    if (!show_mm && !show_loupe && !show_cursor && !ndebug) {
         pthread_mutex_lock(&g_lock);
         g_mm_w = 0;
         pthread_mutex_unlock(&g_lock);
@@ -383,31 +361,6 @@ void overlay_draw(int sw, int sh, unsigned game_fbo, int gw, int gh) {
         rrect(cx_ - r, cy_ - r, 2 * r, 2 * r, r, unit * 0.35f, clear, ring);
         rrect(cx_ - dot - o, cy_ - dot - o, 2 * (dot + o), 2 * (dot + o), dot + o, 0, dark, dark);
         rrect(cx_ - dot, cy_ - dot, 2 * dot, 2 * dot, dot, 0, ring, ring);
-    }
-
-    if (show_flash) {
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_STENCIL_TEST);
-        glEnable(GL_BLEND);
-        glBlendEquation(GL_FUNC_ADD);
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        glUseProgram(g_prog);
-        glBindVertexArray(g_vao);
-        glUniform2f(u_screen, (float)sw, (float)sh);
-        float a = (float)(1.0 - ft / 0.6);
-        float s = unit * 16, cx = d.x + d.w / 2.0f, cy = d.y + d.h / 2.0f;
-        const float bg[4] = {0.02f, 0.05f, 0.08f, 0.55f * a}, none[4] = {0, 0, 0, 0};
-        const float bar[4] = {0.95f, 0.95f, 0.95f, 0.9f * a};
-        rrect(cx - s / 2, cy - s / 2, s, s, s / 2, 0, bg, none);
-        if (ficon == OVERLAY_ICON_PLAY) {
-            float tw = s * 0.36f, th = s * 0.42f;
-            triangle(cx - tw * 0.38f, cy - th / 2, tw, th, bar);
-        } else {
-            float bw = s * 0.14f, bh = s * 0.46f;
-            rrect(cx - bw * 1.6f, cy - bh / 2, bw, bh, bw * 0.3f, 0, bar, none);
-            rrect(cx + bw * 0.6f, cy - bh / 2, bw, bh, bw * 0.3f, 0, bar, none);
-        }
     }
 
 restore:

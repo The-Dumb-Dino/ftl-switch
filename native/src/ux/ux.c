@@ -448,10 +448,7 @@ static void gesture_end(void) {
         // two-finger tap: pause / unpause
         int paused = g_two_finger_pause ? ux_toggle_pause() : -1;
         LOGI("ux: two-finger tap (%.0f ms) -> paused %d", dur * 1000, paused);
-        if (paused >= 0) {
-            overlay_flash(paused ? OVERLAY_ICON_PAUSE : OVERLAY_ICON_PLAY);
-            ux_haptic(2);
-        }
+        if (paused >= 0) ux_haptic(2);  // the game shows its own PAUSED label
     } else {
         rectd v = target_view();
         view_moved_by_player();
