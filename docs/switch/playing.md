@@ -63,10 +63,26 @@ Delete a line to get its default.
 | `pad_<button>` | see below | `a b x y l r zl zr lstick rstick plus minus` |
 | `zoom` | `false` | All of zooming; with it on, `pinch_zoom`, `auto_zoom`, `event_zoom`, `minimap` pick among its parts |
 | `allow_applet_mode` | `false` | Start from the Album too (little memory: may crash) |
+| `check_updates` | `true` | Release builds: offer new versions at start (see below) |
 | `verbose` | `false` | More detail in `logs/` |
 
 Actions for `pad_<button>`: `none tap right_click back pause zoom_in zoom_out
 reset_zoom magnifier turbo precision` (the zoom actions only with `zoom = true`).
+
+## Updates
+
+Release builds look for a newer release on GitHub at start, when the console
+is online. When there is one, the start screen asks:
+
+    A  Update now
+    B  Start without updating
+    X  Skip this version
+
+A downloads it, checks it and puts it in place of `ftl.nro`, then starts the new
+version. If anything goes wrong, the old `ftl.nro` stays and starts instead. X
+writes the version to `update-skip`; delete that file to be asked again.
+`check_updates = false` turns the check off. Builds you make yourself don't
+check.
 
 ## Logs and screenshots
 

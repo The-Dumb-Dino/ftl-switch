@@ -145,6 +145,24 @@ static bool restart_quiet(const char *self) {
     return true;
 }
 
+#ifdef FTL_SWITCH_UPDATE_REPO
+// Start the updated ftl.nro (update_switch.c installed it over self)
+static bool restart_updated(const char *self) {
+    if (envHasNextLoad()) {
+        char args[1100];
+        snprintf(args, sizeof args, "\"%s\"", self);
+        if (R_SUCCEEDED(envSetNextLoad(self, args))) {
+            printf("\nUpdated. Starting the new version...\n");
+            consoleUpdate(NULL);
+            LOGI("start: restarting into the update");
+            return true;
+        }
+    }
+    switch_show_error("FTL was updated: start it again from the Homebrew Menu.");
+    return true;
+}
+#endif
+
 int main(int argc, char **argv) {
     bool quiet = false;
     for (int i = 1; i < argc; i++)
@@ -165,6 +183,18 @@ int main(int argc, char **argv) {
     mkdirs(g_paths.state_dir);
     port_log_open(g_paths.state_dir);
     printf("Log: %s\n", g_paths.state_dir);
+#ifdef FTL_SWITCH_UPDATE_REPO
+    // On the console only: a quiet start is the restart after it, already checked
+    if (!quiet) {
+        switch_update_check(argc > 0 ? argv[0] : NULL);
+        const char *updated = switch_update_installed();
+        if (updated && restart_updated(updated)) {
+            console_off();
+            port_log_flush();
+            return 0;
+        }
+    }
+#endif
     step("Checking memory...");
     char crash_marker[700];
     snprintf(crash_marker, sizeof crash_marker, "%s/crashed", g_paths.state_dir);

@@ -1,6 +1,6 @@
 #!/bin/bash
 # One-time setup for building ftl.nro with the host's clang/lld (see switch/README.md):
-#  - devkitPro's target packages (libnx, newlib, mesa, zlib) into ~/ftl-build/switch/devkitpro.
+#  - devkitPro's target packages (libnx, newlib, mesa, zlib, curl for the updater) into ~/ftl-build/switch/devkitpro.
 #    These are built for the Switch and don't depend on the host, so this works where
 #    devkitPro has no compiler (aarch64 Linux). Only their target files are used.
 #  - elf2nro and nacptool from switch-tools, built for the host.
@@ -24,7 +24,7 @@ file_of() {  # newest version of package $1
   awk '/%FILENAME%/{getline; print; exit}' "$d/desc"
 }
 # target libraries (host-independent); devkita64-gcc only for libgcc, crt files and libstdc++ (mesa)
-for p in libnx devkita64-newlib devkita64-gcc devkita64-rules switch-mesa switch-libdrm_nouveau switch-zlib; do
+for p in libnx devkita64-newlib devkita64-gcc devkita64-rules switch-mesa switch-libdrm_nouveau switch-zlib switch-curl; do
   f=$(file_of $p)
   [ -f "$PKGS/$f" ] || curl -fsS -A "$UA" -o "$PKGS/$f" "$REPO/$f" || curl -fsS -A "$UA" -o "$PKGS/$f" "$REPO/linux/x86_64/$f"
   tar xf "$PKGS/$f" -C "$DKP" --strip-components=2 --warning=no-unknown-keyword opt/devkitpro

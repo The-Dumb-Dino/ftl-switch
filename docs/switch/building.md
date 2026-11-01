@@ -38,6 +38,24 @@ instead.
 names a release build), or from `VERSION=` if set. The Homebrew Menu shows it
 and the logs carry it.
 
+## Releases and the updater
+
+    RELEASE=1 switch/build.sh
+
+builds a release: the same `ftl.nro` plus the built-in updater, which offers
+newer releases of
+[The-Dumb-Dino/ftl-switch](https://github.com/The-Dumb-Dino/ftl-switch) at start
+(see [playing.md](playing.md#updates)). It needs a clean `vX.Y.Z` tag on the
+commit, and curl from `switch/setup.sh`. Other builds have no updater, so
+self-built and forked versions never offer this repository's releases
+(`UPDATE_REPO_OVERRIDE=owner/name` points a release build at another one).
+
+To publish one: tag the commit (`v0.5.0`), build with `RELEASE=1`, and attach
+the result to a GitHub release of that tag as an asset named exactly
+`ftl.nro`. The updater takes the latest release (not drafts or pre-releases),
+compares its tag with its own version, and checks the download against the
+size and SHA-256 GitHub lists for the asset.
+
 ## Testing in Ryujinx
 
 Ryujinx (1.3.3, the Ryubing builds, including aarch64 Linux) runs `ftl.nro`

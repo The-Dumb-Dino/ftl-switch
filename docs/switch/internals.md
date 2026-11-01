@@ -99,6 +99,13 @@ to start it again with `--quiet` (`envSetNextLoad`), which goes straight into
 the game. `appletLockExit` holds a close from the HOME menu until the game has
 saved.
 
+Release builds (`FTL_SWITCH_UPDATE_REPO`) first run `update_switch.c` on that
+console: it asks the GitHub API for the latest release (devkitPro's curl, whose
+TLS is the system's `ssl` service), downloads its `ftl.nro` next to the running
+one as `ftl.nro.new`, checks size, SHA-256 and the NRO header, swaps the files
+(the old one back if that fails) and starts the new one with `envSetNextLoad`.
+Where the loader can't start another .nro, the player is told to start it again.
+
 ## ftlman on the Switch
 
 Rust's standard library has no Switch target, but it supports the 3DS's Horizon

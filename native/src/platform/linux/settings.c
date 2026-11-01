@@ -245,6 +245,7 @@ static const char DEFAULT_SETTINGS[] =
     "zoom = false\n"
     "\n"
     "allow_applet_mode = false   # start from the Album too (little memory: may crash)\n"
+    "check_updates = true        # release builds: offer new versions from GitHub at start\n"
     "verbose = false             # more detail in logs/\n";
 #endif
 
