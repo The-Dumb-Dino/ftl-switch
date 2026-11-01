@@ -34,8 +34,8 @@ Mod text in Windows-1252 rather than UTF-8 is up to ftlman.
 
 [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), which
 Multiverse and other big mods build on, changes the game's code as well as its
-data. The iPad game's Hyperspace (the `android-arm64` branch of
-[Sidd065/FTL-Hyperspace](https://github.com/Sidd065/FTL-Hyperspace)) builds
+data. The iPad game's Hyperspace (Sidd065's iPad fork, with the Linux and Switch
+targets in [The-Dumb-Dino/FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino)) builds
 for Linux with `hyperspace/build-linux.sh` (see [building.md](building.md#optional-hyperspace)).
 The fork has a Linux target (its `buildscripts/linux/`): the iPad code paths
 (`HS_ANDROID`) with the host's clang and glibc, and the `arm64-linux-ftl`

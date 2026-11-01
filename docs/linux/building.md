@@ -35,10 +35,11 @@ of the game is needed to build.
 
     hyperspace/build-linux.sh    # -> ~/ftl-build/hyperspace-linux/Hyperspace.1.6.21.arm64.so
 
-It builds the `android-arm64` branch of
-[Sidd065/FTL-Hyperspace](https://github.com/Sidd065/FTL-Hyperspace), whose
-`buildscripts/linux/` has the Linux target; `HS_REPO=` and `HS_REF=` pick
-another clone or branch.
+It builds the iPad game's Hyperspace from
+[The-Dumb-Dino/FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino)
+(branch `iOS-binary-ports`), whose `buildscripts/linux/` has the Linux target.
+`hyperspace/source.sh` pins the commit, and only that commit is fetched;
+`HS_REPO=` and `HS_REF=` pick another clone, branch or commit.
 
 It needs nothing from the package manager beyond the app's own build: Lua 5.3
 with lpeg and lfs and swig 4.0 (what Hyperspace's code generator and Lua

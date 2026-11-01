@@ -125,7 +125,8 @@ as it is.
 ## Hyperspace
 
 It's the same Hyperspace as for Android and Linux, the
-[iPad fork](https://github.com/Sidd065/FTL-Hyperspace) (`android-arm64`), built
+[iPad fork](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino) (the commit in
+`hyperspace/source.sh`), built
 with its Switch target (`buildscripts/switch/` there; `hyperspace/build-switch.sh`
 runs it):
 

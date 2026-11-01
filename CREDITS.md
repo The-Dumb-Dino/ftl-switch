@@ -52,7 +52,7 @@ New or changed in this project:
 
 | Component | Used for | License |
 |---|---|---|
-| [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace) | Optional mod loader, built from source with the patches in `hyperspace/` | GPL-3.0-or-later |
+| [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace), Linux and Switch targets in [FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino) | Optional mod loader, built from source (`hyperspace/source.sh`) | GPL-3.0-or-later |
 | [ftlman](https://github.com/afishhh/ftlman) by afishhh | Linux: the mod manager, run as its own program. Switch: its patch engine, linked into `ftl.nro` | GPL-2.0 (`ftlman/LICENSE`); see the note below |
 | [LLVM](https://llvm.org/) libc++, libc++abi, libunwind 19.1.7 | The game's C++ runtime, patched (`libcxx/`) and linked in | Apache-2.0 WITH LLVM-exception |
 | [stb_image](https://github.com/nothings/stb) by Sean Barrett | PNG decoding (`native/src/third_party/`) | MIT or public domain |

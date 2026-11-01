@@ -1,5 +1,5 @@
-/* Copy of src/android/HyperspaceHost.h from Hyperspace (github.com/Sidd065/FTL-Hyperspace,
-   branch android-arm64, the iPad game's Hyperspace; the hs_android_ names are its). Keep the two in step; HS_HOST_VERSION guards against mismatches. */
+/* Copy of src/android/HyperspaceHost.h from Hyperspace (the commit in hyperspace/source.sh,
+   the iPad game's Hyperspace; the hs_android_ names are its). Keep the two in step; HS_HOST_VERSION guards against mismatches. */
 #pragma once
 
 #include <stddef.h>
