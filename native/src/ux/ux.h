@@ -6,6 +6,9 @@
 //           4 screen density (dpi), 5 render height (0 = auto),
 //           6 magnifier (0 auto, 1 on, 2 off)
 void ux_configure(int surface_w, int surface_h, int refresh_hz, const float *layout);
+// The surface changed size after ux_configure (desktop windows): the game's canvas
+// keeps its size and is fitted in, centred.
+void ux_surface_resized(int surface_w, int surface_h);
 void ux_handle_touch(int phase, long id, float sx, float sy, double t);
 void ux_handle_back(void);
 void ux_quit(void);  // save and exit (after the player confirmed)

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=FTL: Faster Than Light
+GenericName=Space strategy game
+Comment=FTL for iPad (your own copy) on ARM Linux
+Exec=ftl-linux
+Icon=applications-games
+Terminal=false
+Categories=Game;StrategyGame;
+StartupWMClass=dev.ftlport.linux
+Actions=mods;
+
+[Desktop Action mods]
+Name=Mod Manager (ftlman)
+Exec=ftl-linux --ftlman

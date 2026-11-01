@@ -29,6 +29,19 @@ work.
 
 To update, install the new `.apk` over the old one. Your saves are kept.
 
+## ARM Linux
+
+The same port runs natively on aarch64 Linux (Asahi on Apple Silicon,
+Raspberry Pi, Rockchip boards), with an SDL3 window, mouse, keyboard,
+touchscreen and controller support, and mods with ftlman, the PC mod manager:
+
+    ftl-linux --import FTL.ipa      # or just start it and pick the .ipa
+    ftl-linux
+    ftl-linux --ftlman              # mods
+    ftl-linux --make-portable ~/Games/FTL FTL.ipa   # a folder that runs from anywhere
+
+See [docs/linux.md](docs/linux.md) for building, options and paths.
+
 ## Controls
 
 | Gesture | What it does |

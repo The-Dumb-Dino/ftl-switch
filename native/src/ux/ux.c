@@ -53,6 +53,7 @@ static mo_image *g_img;
 static float g_dpi = 400.0f;
 static bool g_mag_auto;              // magnifier wanted in "automatic" mode (small screen)
 static bool g_two_finger_pause = true;
+static bool g_pinch_zoom = true;     // two fingers zoom and pan the view
 static bool g_haptics = true;
 static int g_event_text;             // event text: 0 the game's size, 1 large, 2 larger
 static int g_window_zoom;            // zoom in on the map and upgrades: 0 automatic (phones), 1 always, 2 off
@@ -168,11 +169,10 @@ int ux_patches_apply(mo_image *img) {
     // The open/close-all-doors keys are tied to the door control buttons, which
     // the iPad build only shows in door mode. Accept them any time, like the
     // desktop game; the ship still checks that the door system is working.
-    uint32_t *dk_open = mo_ptr(img, G_DOOR_KEY_OPEN), *dk_close = mo_ptr(img, G_DOOR_KEY_CLOSE);
-    if (*dk_open == 0x34000228u && *dk_close == 0x34000228u) {  // cbz w8, ...
-        *dk_open = *dk_close = 0xD503201Fu;                       // nop
-        __builtin___clear_cache((char *)dk_open, (char *)(dk_close + 1));
-    } else
+    uint32_t *dk_open = mo_wptr(img, G_DOOR_KEY_OPEN), *dk_close = mo_wptr(img, G_DOOR_KEY_CLOSE);
+    if (*dk_open == 0x34000228u && *dk_close == 0x34000228u)  // cbz w8, ...
+        *dk_open = *dk_close = 0xD503201Fu;                     // nop (mo_protect flushes the icache)
+    else
         LOGW("ux: unexpected code in door hotkeys; Z/X only work in door mode");
     fails += png_install(img) != 0;
     if (targets_install(img) == 0) targets_set_frame_fn(pad_frame);
@@ -236,6 +236,7 @@ static void key_tap(int sil_code) {
     ux_key(sil_code, false);
 }
 static void zoom_at(double factor, double sx, double sy);
+static void pan_by(double dx, double dy);
 
 // ---------------------------------------------------------------------------------
 // view transform: the part of the game image shown on screen (game pixels)
@@ -360,6 +361,20 @@ void ux_configure(int sw, int sh, int refresh_hz, const float *layout) {
          area_w, area_h, (int)l, (int)t, rw, rh, g_dpi, inches, mag == 1 || (mag == 0 && inches < 3.6) ? "on" : "off");
 }
 
+void ux_surface_resized(int sw, int sh) {
+    int rw = g_display.render_w, rh = g_display.render_h;
+    if (sw <= 0 || sh <= 0 || rw <= 0 || rh <= 0) return;
+    int w = sw, h = (int)lround((double)sw * rh / rw);
+    if (h > sh) {
+        h = sh;
+        w = (int)lround((double)sh * rw / rh);
+    }
+    g_display.surface_w = sw;
+    g_display.surface_h = sh;
+    present_set_dest((present_rect){(sw - w) / 2, (sh - h) / 2, w, h});
+    LOGI("ux: surface %dx%d, game shown at %dx%d", sw, sh, w, h);
+}
+
 // ---------------------------------------------------------------------------------
 // touch routing + gestures (main thread)
 #define MAXP 10
@@ -417,6 +432,11 @@ static void gesture_begin(int a, int b) {
 
 static void gesture_update(void) {
     ptr_t *a = &P[g_ga], *b = &P[g_gb];
+    if (!g_pinch_zoom) {  // still a two-finger tap (pause), but the view stays
+        double m = fmax(hypot(a->sx - a->x0, a->sy - a->y0), hypot(b->sx - b->x0, b->sy - b->y0));
+        if (m > g_gmove) g_gmove = m;
+        return;
+    }
     double z = g_z0 * dist(a, b) / g_d0;
     if (z < 1) z = 1;
     if (z > ZOOM_MAX) z = ZOOM_MAX;
@@ -673,6 +693,8 @@ static void synth_touch(int phase, double sx, double sy) {
 }
 
 static bool g_mouse_right;
+static bool g_mouse_middle;  // dragging the zoomed view
+static float g_middle_x, g_middle_y;
 static void mouse_right(int action, double sx, double sy) {
     double gx, gy;
     surface_to_game(sx, sy, &gx, &gy);
@@ -692,6 +714,11 @@ void ux_handle_mouse(int action, float sx, float sy, float wheel) {
     case 0:
         synth_touch(TOUCH_MOVED, sx, sy);  // drags while the button is down
         if (g_mouse_right) mouse_right(HS_RIGHT_BUTTON_MOVE, sx, sy);
+        if (g_mouse_middle) {
+            pan_by(g_middle_x - sx, g_middle_y - sy);
+            g_middle_x = sx;
+            g_middle_y = sy;
+        }
         break;
     case 1: synth_touch(TOUCH_BEGAN, sx, sy); break;
     case 2: synth_touch(TOUCH_ENDED, sx, sy); break;
@@ -707,6 +734,12 @@ void ux_handle_mouse(int action, float sx, float sy, float wheel) {
         if (g_mouse_right) mouse_right(HS_RIGHT_BUTTON_UP, sx, sy);
         g_mouse_right = false;
         break;
+    case 5:  // middle button: drag the zoomed-in view around
+        g_mouse_middle = true;
+        g_middle_x = sx;
+        g_middle_y = sy;
+        break;
+    case 6: g_mouse_middle = false; break;
     case 7: if (wheel != 0) zoom_at(wheel > 0 ? 1.25 : 0.8, sx, sy); break;
     default: break;
     }
@@ -913,6 +946,7 @@ void ux_set_option(const char *key, float value) {
     if (!strcmp(key, "reset_zoom")) ux_reset_zoom(true);
     else if (!strcmp(key, "magnifier")) overlay_loupe_enable(value == 1 || (value == 0 && g_mag_auto));
     else if (!strcmp(key, "two_finger_pause")) g_two_finger_pause = value != 0;
+    else if (!strcmp(key, "pinch_zoom")) g_pinch_zoom = value != 0;
     else if (!strcmp(key, "minimap")) overlay_minimap_enable(value != 0);
     else if (!strcmp(key, "haptics")) g_haptics = value != 0;
     else if (!strcmp(key, "event_text")) g_event_text = (int)value;
