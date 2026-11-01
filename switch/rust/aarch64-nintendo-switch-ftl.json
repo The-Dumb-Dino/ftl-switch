@@ -1,0 +1,29 @@
+{
+  "arch": "aarch64",
+  "data-layout": "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32",
+  "llvm-target": "aarch64-unknown-none",
+  "target-pointer-width": 64,
+  "target-c-int-width": 32,
+  "os": "horizon",
+  "env": "newlib",
+  "vendor": "nintendo",
+  "target-family": ["unix"],
+  "features": "+v8a,+crc,+crypto,+neon",
+  "cpu": "cortex-a57",
+  "max-atomic-width": 128,
+  "relocation-model": "pic",
+  "position-independent-executables": true,
+  "static-position-independent-executables": true,
+  "has-thread-local": false,
+  "panic-strategy": "abort",
+  "linker": "ld.lld",
+  "linker-flavor": "ld.lld",
+  "executables": false,
+  "crt-objects-fallback": "false",
+  "metadata": {
+    "description": "Nintendo Switch homebrew (libnx + devkitPro newlib) for ftl.nro: Rust's std as on the 3DS's Horizon",
+    "std": true,
+    "tier": 3,
+    "host_tools": false
+  }
+}

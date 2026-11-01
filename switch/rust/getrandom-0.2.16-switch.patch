@@ -1,0 +1,24 @@
+diff -ru -x target crates.io/getrandom-0.2.16/src/lib.rs rust-crates/getrandom-0.2.16/src/lib.rs
+--- a/src/lib.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/lib.rs	2026-10-30 11:28:43.616077989 +0100
+@@ -253,7 +253,7 @@
+         target_os = "illumos",
+         // Check for target_arch = "arm" to only include the 3DS. Does not
+         // include the Nintendo Switch (which is target_arch = "aarch64").
+-        all(target_os = "horizon", target_arch = "arm"),
++        target_os = "horizon",
+         target_os = "cygwin",
+     ))] {
+         mod util_libc;
+diff -ru -x target crates.io/getrandom-0.2.16/src/util_libc.rs rust-crates/getrandom-0.2.16/src/util_libc.rs
+--- a/src/util_libc.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/util_libc.rs	2026-10-30 11:28:43.615932787 +0100
+@@ -21,7 +21,7 @@
+         use libc::_errnop as errno_location;
+     } else if #[cfg(target_os = "nto")] {
+         use libc::__get_errno_ptr as errno_location;
+-    } else if #[cfg(any(all(target_os = "horizon", target_arch = "arm"), target_os = "vita"))] {
++    } else if #[cfg(any(target_os = "horizon", target_os = "vita"))] {
+         extern "C" {
+             // Not provided by libc: https://github.com/rust-lang/libc/issues/1995
+             fn __errno() -> *mut libc::c_int;

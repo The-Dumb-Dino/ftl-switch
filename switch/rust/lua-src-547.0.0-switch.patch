@@ -1,0 +1,12 @@
+diff -ru crates.io/lua-src-547.0.0/src/lib.rs rust-crates/lua-src/src/lib.rs
+--- a/src/lib.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/lib.rs	2026-10-30 11:28:09.625075555 +0100
+@@ -100,6 +100,8 @@
+                     _ => config.define("LUA_USE_POSIX", None),
+                 };
+             }
++            // ftl.nro: the Switch (newlib): plain ANSI C Lua
++            _ if target.contains("nintendo-switch") => {}
+             _ if target.contains("windows") => {
+                 // Defined in Lua >= 5.3
+                 config.define("LUA_USE_WINDOWS", None);

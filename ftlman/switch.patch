@@ -1,0 +1,162 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -6,9 +6,19 @@
+ [features]
+ default = ["gui"]
+ # The mod manager window. Without it ftlman is command-line only (e.g. in ftl.nro).
+-gui = ["dep:eframe", "dep:egui_dnd", "dep:egui_extras", "dep:yeslogic-fontconfig-sys"]
++gui = ["dep:open", "dep:eframe", "dep:egui_dnd", "dep:egui_extras", "dep:yeslogic-fontconfig-sys"]
+ portable-release = []
+ 
++[lib]
++# Only for ftl.nro (the Switch port): `cargo build --lib --target <switch>`
++name = "ftlman_switch"
++path = "src/switch_lib.rs"
++crate-type = ["staticlib"]
++
++[[bin]]
++name = "ftlman"
++path = "src/bin_main.rs"
++
+ [dependencies]
+ env_logger = "0.11"
+ log = "0.4"
+@@ -70,7 +80,7 @@
+ jiff = { version = "0.2" }
+ 
+ # This dependency could be removed but it's pretty small.
+-open = "5.3.1"
++open = { version = "5.3.1", optional = true }  # the window only (not on the Switch)
+ 
+ mlua = { version = "0.10", features = ["lua54", "macros", "vendored", "error-send", "serialize"] }
+ gc-arena = "0.5.3"
+@@ -104,6 +114,11 @@
+ debug = true
+ 
+ [patch.crates-io]
++# ftl.nro (the Switch): crates with the Switch added (switch/rust/build-ftlman.sh copies them here)
++lua-src = { path = "switch-crates/lua-src" }
++libc = { path = "switch-crates/libc" }
++getrandom = { path = "switch-crates/getrandom-0.2.16" }
++getrandom3 = { path = "switch-crates/getrandom-0.3.3", package = "getrandom" }
+ egui = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
+ eframe = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
+ epaint = { git = "https://github.com/afishhh/egui", rev = "f5d9f00117b3f8ff0af59924151fa2b9b584ce7d" }
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,7 +1,4 @@
+-#![feature(offset_of_enum)] // :)
+-#![feature(iter_order_by)] // lazy
+-// Without the window much of the shared code goes unused; that's expected.
+-#![cfg_attr(not(feature = "gui"), allow(dead_code, unused_imports))]
++// The crate roots are bin_main.rs (ftlman) and switch_lib.rs (ftl.nro), which include this.
+ 
+ use std::{
+     borrow::Cow,
+--- a/src/bin_main.rs
++++ b/src/bin_main.rs
+@@ -0,0 +1,6 @@
++#![feature(offset_of_enum)] // :)
++#![feature(iter_order_by)] // lazy
++// Without the window much of the shared code goes unused; that's expected.
++#![cfg_attr(not(feature = "gui"), allow(dead_code, unused_imports))]
++
++include!("main.rs");
+--- a/src/switch_lib.rs
++++ b/src/switch_lib.rs
+@@ -0,0 +1,95 @@
++#![feature(offset_of_enum)]
++#![feature(iter_order_by)]
++#![allow(dead_code, unused_imports)]
++// ftlman's patching, linked into ftl.nro (the Switch port of FTL for iPad): the same
++// code as `ftlman patch`, called from C. No window, no updater, no Hyperspace
++// installer: ftl.nro brings its own Hyperspace.
++
++include!("main.rs");
++
++mod switch_api {
++    use std::ffi::{CStr, c_char};
++    use std::path::PathBuf;
++
++    use crate::{Mod, ModSource};
++
++    type LogFn = extern "C" fn(level: i32, msg: *const c_char);
++
++    struct CLogger(LogFn);
++    impl log::Log for CLogger {
++        fn enabled(&self, m: &log::Metadata) -> bool {
++            m.level() <= log::Level::Info
++        }
++        fn log(&self, r: &log::Record) {
++            if !self.enabled(r.metadata()) {
++                return;
++            }
++            let level = match r.level() {
++                log::Level::Error => 2,
++                log::Level::Warn => 1,
++                _ => 0,
++            };
++            let msg = format!("ftlman: {}\0", r.args());
++            (self.0)(level, msg.as_ptr() as *const c_char);
++        }
++        fn flush(&self) {}
++    }
++
++    /// Patches data_dir/ftl.dat with the n mods (paths to .ftl/.zip files or
++    /// folders), starting from data_dir/ftl.dat.vanilla (made on the first run), as
++    /// `ftlman patch` does. log gets ftlman's messages; on failure the reason is
++    /// written to err. Returns 0 on success.
++    #[unsafe(no_mangle)]
++    pub extern "C" fn ftlman_patch(
++        data_dir: *const c_char,
++        mods: *const *const c_char,
++        n: usize,
++        log: Option<LogFn>,
++        err: *mut c_char,
++        errlen: usize,
++    ) -> i32 {
++        if let Some(f) = log {
++            static LOGGER: std::sync::OnceLock<CLogger> = std::sync::OnceLock::new();
++            if log::set_logger(LOGGER.get_or_init(|| CLogger(f))).is_ok() {
++                log::set_max_level(log::LevelFilter::Info);
++            }
++        }
++        let cstr = |p: *const c_char| unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
++        let data_dir = PathBuf::from(cstr(data_dir));
++        let mods: Vec<Mod> = (0..n)
++            .map(|i| {
++                let path = PathBuf::from(cstr(unsafe { *mods.add(i) }));
++                let source = if path.is_dir() { ModSource::Directory { path } } else { ModSource::Zip { path } };
++                Mod::new_with_enabled(source, true)
++            })
++            .collect();
++        let mut diagnostics = crate::validate::Diagnostics::new();
++        let result = crate::apply::apply_ftl(
++            &data_dir,
++            mods,
++            |stage| match stage {
++                crate::apply::ApplyStage::Preparing => log::info!("Preparing..."),
++                crate::apply::ApplyStage::Repacking => log::info!("Repacking..."),
++                _ => {}
++            },
++            true,
++            Some(&mut diagnostics),
++            false,
++        );
++        match result {
++            Ok(()) => 0,
++            Err(e) => {
++                let msg = format!("{e:#}");
++                if !err.is_null() && errlen > 0 {
++                    let b = msg.as_bytes();
++                    let k = b.len().min(errlen - 1);
++                    unsafe {
++                        std::ptr::copy_nonoverlapping(b.as_ptr(), err as *mut u8, k);
++                        *err.add(k) = 0;
++                    }
++                }
++                1
++            }
++        }
++    }
++}

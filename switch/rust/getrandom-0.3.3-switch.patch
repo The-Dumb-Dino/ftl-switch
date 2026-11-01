@@ -1,0 +1,36 @@
+diff -ru -x target crates.io/getrandom-0.3.3/Cargo.toml rust-crates/getrandom-0.3.3/Cargo.toml
+--- a/Cargo.toml	2006-07-24 03:21:28.000000000 +0200
++++ b/Cargo.toml	2026-10-30 11:28:53.249804245 +0100
+@@ -105,7 +105,7 @@
+ version = "5.1"
+ default-features = false
+ 
+-[target.'cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "hurd", target_os = "illumos", target_os = "cygwin", all(target_os = "horizon", target_arch = "arm")))'.dependencies.libc]
++[target.'cfg(any(target_os = "dragonfly", target_os = "freebsd", target_os = "hurd", target_os = "illumos", target_os = "cygwin", target_os = "horizon"))'.dependencies.libc]
+ version = "0.2.154"
+ default-features = false
+ 
+diff -ru -x target crates.io/getrandom-0.3.3/src/backends.rs rust-crates/getrandom-0.3.3/src/backends.rs
+--- a/src/backends.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/backends.rs	2026-10-30 11:28:43.627710541 +0100
+@@ -110,7 +110,7 @@
+         target_os = "cygwin",
+         // Check for target_arch = "arm" to only include the 3DS. Does not
+         // include the Nintendo Switch (which is target_arch = "aarch64").
+-        all(target_os = "horizon", target_arch = "arm"),
++        target_os = "horizon",
+     ))] {
+         mod getrandom;
+         pub use getrandom::*;
+diff -ru -x target crates.io/getrandom-0.3.3/src/util_libc.rs rust-crates/getrandom-0.3.3/src/util_libc.rs
+--- a/src/util_libc.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/util_libc.rs	2026-10-30 11:28:43.627333806 +0100
+@@ -14,7 +14,7 @@
+         use libc::_errnop as errno_location;
+     } else if #[cfg(target_os = "nto")] {
+         use libc::__get_errno_ptr as errno_location;
+-    } else if #[cfg(any(all(target_os = "horizon", target_arch = "arm"), target_os = "vita"))] {
++    } else if #[cfg(any(target_os = "horizon", target_os = "vita"))] {
+         extern "C" {
+             // Not provided by libc: https://github.com/rust-lang/libc/issues/1995
+             fn __errno() -> *mut libc::c_int;

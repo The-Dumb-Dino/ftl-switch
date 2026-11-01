@@ -1,0 +1,87 @@
+diff -ru crates.io/libc-0.2.191/src/unix/newlib/horizon/mod.rs rust-libc/src/unix/newlib/horizon/mod.rs
+--- a/src/unix/newlib/horizon/mod.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/unix/newlib/horizon/mod.rs	2026-10-30 11:29:22.066629846 +0100
+@@ -281,4 +281,15 @@
+     pub fn getrandom(buf: *mut c_void, buflen: size_t, flags: c_uint) -> ssize_t;
+ 
+     pub fn gethostid() -> c_long;
++
++    // in devkitPro's newlib for the Switch (libsysbase)
++    #[cfg(target_arch = "aarch64")]
++    pub fn seekdir(dirp: *mut crate::DIR, loc: c_long);
++    #[cfg(target_arch = "aarch64")]
++    pub fn telldir(dirp: *mut crate::DIR) -> c_long;
++    // provided by ftl.nro (compat_switch.c)
++    #[cfg(target_arch = "aarch64")]
++    pub fn futimes(fd: c_int, times: *const crate::timeval) -> c_int;
++    #[cfg(target_arch = "aarch64")]
++    pub fn lutimes(file: *const c_char, times: *const crate::timeval) -> c_int;
+ }
+diff -ru crates.io/libc-0.2.191/src/unix/newlib/mod.rs rust-libc/src/unix/newlib/mod.rs
+--- a/src/unix/newlib/mod.rs	2006-07-24 03:21:28.000000000 +0200
++++ b/src/unix/newlib/mod.rs	2026-10-30 11:25:32.916947024 +0100
+@@ -1,7 +1,15 @@
+ use crate::prelude::*;
+ 
+-pub type blkcnt_t = i32;
+-pub type blksize_t = i32;
++cfg_if! {
++    // The Switch (Horizon on aarch64, devkitPro's newlib): long-sized
++    if #[cfg(all(target_os = "horizon", target_arch = "aarch64"))] {
++        pub type blkcnt_t = i64;
++        pub type blksize_t = i64;
++    } else {
++        pub type blkcnt_t = i32;
++        pub type blksize_t = i32;
++    }
++}
+ 
+ cfg_if! {
+     if #[cfg(target_os = "rtems")] {
+@@ -16,6 +24,10 @@
+         pub type dev_t = c_short;
+         pub type ino_t = c_ushort;
+         pub type off_t = c_long;
++    } else if #[cfg(all(target_os = "horizon", target_arch = "aarch64"))] {
++        pub type dev_t = c_short;
++        pub type ino_t = c_ushort;
++        pub type off_t = i64;
+     } else if #[cfg(target_os = "rtems")] {
+         pub type dev_t = u64;
+         pub type ino_t = u64;
+@@ -57,7 +69,13 @@
+ 
+ pub type socklen_t = u32;
+ pub type speed_t = u32;
+-pub type suseconds_t = i32;
++cfg_if! {
++    if #[cfg(all(target_os = "horizon", target_arch = "aarch64"))] {
++        pub type suseconds_t = i64;
++    } else {
++        pub type suseconds_t = i32;
++    }
++}
+ cfg_if! {
+     if #[cfg(target_os = "espidf")] {
+         pub type tcflag_t = u16;
+@@ -393,7 +411,19 @@
+ }
+ 
+ cfg_if! {
+-    if #[cfg(target_os = "espidf")] {
++    if #[cfg(all(target_os = "horizon", target_arch = "aarch64"))] {
++        // devkitPro's newlib for the Switch (libnx's locks); measured with its headers.
++        // The Rust types round up to 8-byte alignment, which only makes them larger.
++        const __PTHREAD_INITIALIZER_BYTE: u8 = 0x00;
++        pub const __SIZEOF_PTHREAD_ATTR_T: usize = 24;
++        pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 12;
++        pub const __SIZEOF_PTHREAD_MUTEXATTR_T: usize = 4;
++        pub const __SIZEOF_PTHREAD_COND_T: usize = 16;
++        pub const __SIZEOF_PTHREAD_CONDATTR_T: usize = 8;
++        pub const __SIZEOF_PTHREAD_RWLOCK_T: usize = 16;
++        pub const __SIZEOF_PTHREAD_RWLOCKATTR_T: usize = 4;
++        pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 32;
++    } else if #[cfg(target_os = "espidf")] {
+         const __PTHREAD_INITIALIZER_BYTE: u8 = 0xff;
+         pub const __SIZEOF_PTHREAD_ATTR_T: usize = 32;
+         pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 4;
