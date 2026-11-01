@@ -1,0 +1,62 @@
+# Building ftl.nro
+
+The Switch build uses the host's clang and lld, not devkitPro's gcc: devkitPro
+has no compiler for aarch64 Linux hosts, and the game's C++ library has to be
+built with clang anyway (Apple's C++ ABI). devkitPro's *target* packages
+(libnx, newlib, mesa, zlib) are built for the Switch and work with any host, so
+they're used as they are.
+
+You need what the Linux build needs for libc++ (clang/lld, CMake, Ninja,
+Python 3, `patch`, the LLVM 19.1.7 sources; see
+[../linux/building.md](../linux/building.md)), plus a nightly Rust toolchain
+for ftlman (`build-ftlman.sh` adds `rust-src`; std must use libc 0.2.191,
+which the script checks), and Pillow for the icon. Then:
+
+    switch/setup.sh             # once: devkitPro's target packages, elf2nro, nacptool
+    libcxx/build.sh switch      # libc++ with Apple's ABI, for newlib + libnx
+    hyperspace/build-switch.sh  # optional: Hyperspace, linked in when built
+    switch/rust/build-ftlman.sh # optional: ftlman's patch engine, linked in when built
+    IPA=FTL.ipa switch/build.sh # -> ~/ftl-build/switch/build/ftl.nro
+
+All output goes to `~/ftl-build/` (outside the repository).
+`HYPERSPACE= switch/build.sh` builds without Hyperspace, `FTLMAN=` without
+ftlman (then mods can only be patched on a PC).
+
+## The icon
+
+`IPA=FTL.ipa switch/build.sh` (or an `.ipa` in `~/ftl-build/switch/`) gives
+`ftl.nro` the game's own icon for the Homebrew Menu: `tools/ipa_icon.py` takes
+the largest one in your `.ipa`'s asset catalog (the 1024×1024 App Store icon),
+decodes it (Apple's LZVN compression, in Python) and scales it to the 256×256
+JPEG an `.nro` carries (Pillow). It's made in the build folder only, so no game
+art is in the repository. `FTL_SWITCH_ICON=icon.jpg` uses your own JPEG
+instead.
+
+## Version string
+
+`switch/build.sh` takes the version from `git describe` (so a tag like `v1.0.0`
+names a release build), or from `VERSION=` if set. The Homebrew Menu shows it
+and the logs carry it.
+
+## Testing in Ryujinx
+
+Ryujinx (1.3.3, the Ryubing builds, including aarch64 Linux) runs `ftl.nro`
+with `prod.keys` from your own console in `~/.config/Ryujinx/system/`; no
+firmware is needed. Put `ftl.nro` and the `.ipa` in its emulated SD card,
+`~/.config/Ryujinx/sdcard/switch/ftl/`. On a 16K-page kernel (Asahi) set
+Options → Settings → System → Memory Manager Mode to "Software", and use the
+OpenGL backend.
+
+Ryujinx is more forgiving than a console: it doesn't enforce memory permissions
+of the `.nro`'s segments, nor the GPU driver's memory limits. A build that runs
+there can still crash on a console; see [internals.md](internals.md#relocations-and-read-only-memory).
+
+Logs reach Ryujinx's own log (as `OutputDebugString`), and the `screenshot`
+file (see [playing.md](playing.md#logs-and-screenshots)) works there too.
+
+## Crash addresses
+
+Crash backtraces in the session log name the game's frames as `FTL+<address>`
+(as a disassembler shows the 1.6.21 binary) and the port's as
+`ftl.elf+<offset>`, for `llvm-symbolizer --obj=ftl.elf` on the build's
+`~/ftl-build/switch/build/ftl.elf`.

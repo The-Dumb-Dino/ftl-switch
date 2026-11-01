@@ -5,15 +5,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting this. The session logs help the most: they show what the game was doing and what went wrong, along with the machine, the kernel's page size, ftl-linux's version and its settings. Nothing personal is in them.
+        Thanks for reporting this. The session logs help the most: they show what the game was doing and what went wrong, along with the memory FTL had, ftl.nro's version and its settings. Nothing personal is in them.
 
-        `ftl-linux --paths` shows the log folder (`~/.local/state/ftl-linux` when installed, `data/logs` in a portable folder). The last five sessions are kept, so attach the newest `session-*.txt` soon after the problem.
+        They're in `sdmc:/switch/ftl/logs/` on the SD card: attach the newest `session-*.txt` soon after the problem (the last five sessions are kept). With Hyperspace, add `zhl.log` and `FTL_HS.log` from the same folder, and with mods applied on the console, `mods.applied`.
 
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
-      description: What you did, what happened, and what you expected to happen instead.
+      description: What you did, what happened, and what you expected to happen instead. If the console showed an error, its text and code.
     validations:
       required: true
 
@@ -25,39 +25,38 @@ body:
       placeholder: |
         1. Start a new game with the Kestrel
         2. Open the map and jump to the second beacon
-        3. Click the first answer in the event
+        3. Tap the first answer in the event
 
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: The session log(s), as described above. With Hyperspace, zhl.log and FTL_HS.log too.
+      description: The files described above.
 
   - type: textarea
     id: screenshots
     attributes:
-      label: Screenshots or a screen recording
-      description: A picture often shows a problem faster than words, above all something drawn wrong or cut off.
+      label: Screenshots or a recording
+      description: The console's own capture button works; so does an empty file named `screenshot` in `sdmc:/switch/ftl/` (see docs/switch/playing.md).
 
   - type: textarea
     id: mods
     attributes:
       label: Mods
-      description: The mods applied in ftlman, in its order (top first). Write "none" if you play without mods.
-      placeholder: Hyperspace.ftl, Multiverse Assets, Multiverse Data
+      description: The mods applied, in order (top first), and whether they were applied on the console or on a PC. Write "none" if you play without mods.
+      placeholder: Hyperspace.ftl, Multiverse Assets, Multiverse Data (applied on a PC)
     validations:
       required: true
 
   - type: input
     id: system
     attributes:
-      label: Machine and distribution
-      description: Only needed if you can't attach the logs, which include them.
-      placeholder: MacBook Air M1, Fedora Asahi Remix 42, KDE on Wayland
+      label: Firmware, Atmosphère, and how FTL was started
+      placeholder: firmware 22.1.0, Atmosphère (its version), NSP forwarder
 
   - type: input
     id: controller
     attributes:
-      label: Game controller
-      description: If it's about a controller, which one, and is it connected by USB or Bluetooth?
-      placeholder: DualSense, Bluetooth
+      label: Controls
+      description: Handheld (touch), Joy-Cons attached or detached, Pro Controller?
+      placeholder: Joy-Cons detached

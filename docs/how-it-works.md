@@ -1,19 +1,19 @@
 # How it works
 
-Building and using it are described in the [README](../README.md) and in
-`docs/linux/`. This document is about how the port works.
+Building and using it are described in the [README](../README.md),
+`docs/switch/` and `docs/linux/`. This document is about the core both share;
+what's specific to the Switch is in [switch/internals.md](switch/internals.md).
 
 The idea, and most of the machinery described here, comes from
 [ftl-android](https://github.com/Sidd065/ftl-android) by Sidd065: the Mach-O
 loader, the Objective-C runtime, the iOS frameworks and the touch layer. This
-project took that core off Android and onto Linux (and the Switch, in the
-companion ftl-switch repository). [CREDITS.md](../CREDITS.md) lists what came
+project took that core off Android and onto Linux and the Nintendo Switch. [CREDITS.md](../CREDITS.md) lists what came
 from where.
 
 ## The short version
 
 Nothing is recompiled. The original arm64 iOS executable of FTL for iPad runs
-as it is, inside a normal Linux program:
+as it is, inside a normal program (a Linux program, or a Switch homebrew `.nro`):
 
 1. The **Mach-O loader** maps the game's executable into memory and links its
    imports against the port's own replacements.
@@ -21,8 +21,8 @@ as it is, inside a normal Linux program:
    Darwin's ABI, an **Objective-C runtime** with Apple's ABI, Apple's C++
    library ABI, and small reimplementations of the **iOS frameworks** the game
    uses (UIKit, Foundation, QuartzCore/OpenGL ES, AudioToolbox, ...).
-3. A **platform layer** connects all of that to the host: here SDL3 for the
-   window, EGL/GLES 3 for drawing, input and audio.
+3. A **platform layer** connects all of that to the host: SDL3 on Linux,
+   libnx on the Switch, with EGL/GLES 3 for drawing on both.
 4. A **UX layer** adds what the iPad game doesn't have on a desktop: mouse,
    keyboard and controller input, zoom, the magnifier, and help for PC mods.
 
@@ -32,8 +32,11 @@ The game believes it is on an iPad whose screen has the window's shape.
 
 ```
 native/src/
+  platform/switch/ ftl.nro: libnx, EGL on mesa, touch, Joy-Cons, applets, code
+                   memory under Horizon, mods with ftlman's engine
   platform/linux/  ftl-linux: SDL3 window, EGL, input, audio, dialogs, settings.ini,
-                   import, portable folders, ftlman, logs (main_linux.c, plat_sdl.c)
+                   import, portable folders, ftlman, logs (main_linux.c, plat_sdl.c);
+                   import, settings, zip reading and mods are shared with the Switch
   ux/              layout, zoom, gestures, magnifier, minimap, hotkeys, controller
                    cursor, mods' images and atlases, PNG
   fw/              UIKit, Foundation, QuartzCore/EAGL, AudioUnit, GameKit and
@@ -73,8 +76,9 @@ the loader act as if pages were 64K.
 
 **Executable memory** goes through `loader/execmem.h`: allocate, protect, and
 separate write and execute views of the same code. On Linux one anonymous
-mapping serves both. The interface exists for hosts that never allow writable
-code, where code is written through a second view.
+mapping serves both. The Switch never allows writable code, so there the code
+is written through a second view of it
+([switch/internals.md](switch/internals.md#how-the-games-code-is-mapped)).
 
 ## The Objective-C runtime (`objc/`)
 
@@ -161,8 +165,9 @@ For mods' right clicks, `ux.c` asks it whether a script listens for the right
 button (`hs_android_wants_right_click`) and, if so, sends it the touch gesture
 (one finger held, a tap with another) and the mouse's right button
 (`hs_android_right_button`). `hyperspace/` builds it (`linux.patch` on top of
-the fork).
+the fork; on the Switch it is linked in, see
+[switch/internals.md](switch/internals.md#hyperspace)).
 
 The `hs_android_*` names and the `HS_ANDROID` code paths are kept on purpose:
-the interface is shared with the fork's Android host, and the Linux changes are
-meant to be merged back into it.
+the interface is shared with the fork's Android host, and the Linux and Switch
+changes are meant to be merged back into it.

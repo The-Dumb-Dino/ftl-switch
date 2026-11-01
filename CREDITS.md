@@ -5,7 +5,7 @@
 FTL: Faster Than Light is made by [Subset Games](https://subsetgames.com/).
 This project contains nothing of the game: it runs your own copy of FTL for
 iPad, which you import from your own `.ipa`. It isn't affiliated with or
-endorsed by Subset Games or Apple.
+endorsed by Subset Games, Apple or Nintendo.
 
 ## Based on ftl-android
 
@@ -29,6 +29,12 @@ From ftl-android, largely as it was there:
 
 New or changed in this project:
 
+- the Nintendo Switch homebrew port, `ftl.nro` (`native/src/platform/switch/`,
+  `switch/`): the clang/lld toolchain for libnx, code memory under Horizon,
+  touch, Joy-Cons, the keyboard and error applets, mods applied on the console
+  with ftlman's engine (`switch/rust/`, `ftlman/switch.patch`), Hyperspace
+  linked in (`hyperspace/switch.patch`), the icon from your `.ipa`
+  (`tools/ipa_icon.py`)
 - the Linux desktop app, `ftl-linux` (`native/src/platform/linux/`): SDL3
   window, EGL/GLES 3, mouse, keyboard, touchscreen and controller input, audio,
   dialogs, XDG paths, settings.ini, session logs, crash reports, importing the
@@ -47,12 +53,14 @@ New or changed in this project:
 | Component | Used for | License |
 |---|---|---|
 | [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace) | Optional mod loader, built from source with the patches in `hyperspace/` | GPL-3.0-or-later |
-| [ftlman](https://github.com/afishhh/ftlman) by afishhh | The mod manager, built from source and run as its own program | GPL-2.0 (`ftlman/LICENSE`) |
+| [ftlman](https://github.com/afishhh/ftlman) by afishhh | Linux: the mod manager, run as its own program. Switch: its patch engine, linked into `ftl.nro` | GPL-2.0 (`ftlman/LICENSE`); see the note below |
 | [LLVM](https://llvm.org/) libc++, libc++abi, libunwind 19.1.7 | The game's C++ runtime, patched (`libcxx/`) and linked in | Apache-2.0 WITH LLVM-exception |
 | [stb_image](https://github.com/nothings/stb) by Sean Barrett | PNG decoding (`native/src/third_party/`) | MIT or public domain |
 | [SDL3](https://libsdl.org/) | Window, input, audio (the system's) | zlib |
 | [zlib](https://zlib.net/) | `ftl.dat` and `.ipa` reading (the system's) | zlib |
 | Boost, Lua, minizip (via vcpkg) | Hyperspace's dependencies | BSL-1.0, MIT, zlib |
+| [libnx](https://github.com/switchbrew/libnx), devkitPro's newlib, mesa, zlib | The Switch build's system libraries, linked in | ISC; BSD-style; MIT; zlib |
+| The Rust standard library and ftlman's crates | ftlman's engine on the Switch | MIT / Apache-2.0 and others |
 
 ## License
 
@@ -70,6 +78,17 @@ Foundation, version 3 (see [LICENSE](LICENSE)).
 
 Since the ftl-android parts don't carry "or later", the project as a whole is
 distributed under version 3 of the GPL.
+
+**A note on ftlman in `ftl.nro`.** ftlman ships the text of the GPL version 2
+and doesn't say "or later". On Linux it runs as a separate program, so that
+doesn't matter. On the Switch its engine is linked into the same executable as
+GPL-3.0 code (this project and Hyperspace), and GPL-2.0-only and GPL-3.0 code
+can't be combined in one program. Before distributing an `ftl.nro` built with
+ftlman (`switch/rust/build-ftlman.sh`), this needs ftlman's author to confirm
+"version 2 or later", or ftlman needs to become a separate program; `FTLMAN=
+switch/build.sh` builds `ftl.nro` without it (mods are then patched on a PC).
+This repository itself only holds patches and build scripts for ftlman, not its
+code.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
