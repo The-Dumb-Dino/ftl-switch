@@ -110,6 +110,8 @@ The Renegade Collection (patched on the console, and on a PC).
 - Mods are switched on and off in the mod list: press L when the start screen
   offers it (see
   [mods.md](mods.md#the-mod-list)).
-- Applying big mods on the console takes a while; without enough memory to do
-  it in memory (started from the Album), Multiverse with addons takes 20 minutes
-  or more. Patching on a PC is faster: see [mods.md](mods.md#big-mods-patch-on-a-pc).
+- Mods are patched on the console in memory: Multiverse with the Renegade
+  Collection takes about two minutes. A mod set too large for that (or FTL
+  started from the Album) is patched on the SD card, which takes 20 minutes or
+  more; patch such a set on a PC instead: see
+  [mods.md](mods.md#very-large-mod-sets-patch-on-a-pc).

@@ -13,11 +13,13 @@ a PC). Then the game starts with them.
   name are on and follow by name), else by name.
 - Every patch starts from the original, kept as `game/ftl.dat.vanilla`. Taking
   all mods out of the folder puts the original back.
-- With enough free memory (FTL started with a game's memory, see
-  [playing.md](playing.md)) the patch happens in memory: `ftl.dat.vanilla` is
-  read once and the new `ftl.dat` written once, which is much faster than
-  patching the file on the SD card. With too little (started from the Album),
-  it patches on the SD card, which is slow for big mods.
+- The patch happens in memory: `ftl.dat.vanilla` is read once and the new
+  `ftl.dat` written once. Multiverse with the Renegade Collection takes about
+  two minutes. That needs FTL started with a game's memory (see
+  [playing.md](playing.md)), and room for the game's `ftl.dat` plus the mods
+  unpacked (Multiverse with the Renegade Collection: about 1.1 GB of the
+  roughly 2.7 GB there is). When that doesn't fit, it patches on the SD card
+  instead, which takes 20 minutes or more for Multiverse.
 - If a mod can't be applied, FTL says why and plays without mods; fix or remove
   the mod and start again. ftlman's messages are in `logs/`.
 - After a change the game starts at the title screen (a run saved with other
@@ -42,11 +44,14 @@ there). The list shows the mods and which are on:
 changed. All off puts the original `ftl.dat` back (a copy, so it's quick), and
 the mods stay in the folder for later. Hyperspace stays first in the list.
 
-## Big mods: patch on a PC
+## Very large mod sets: patch on a PC
 
-Applying big mods on the console takes a while, and on the SD card (too little
-memory for patching in memory) Multiverse with addons takes 20 minutes or more;
-ftlman on a PC does it in under a minute, and the console only needs the result:
+Multiverse and its usual addons patch on the console in a few minutes. Only a
+mod set too large to patch in memory (many big addons on top of Multiverse, or
+FTL started from the Album) falls back to the SD card, which is slow; the log
+then says `Patching on the SD card`. For such a set, patching on a PC is
+faster: ftlman there does it in under a minute, and the console only needs the
+result:
 
 1. Copy the iPad game's original `ftl.dat` to a folder on the PC:
    `sdmc:/switch/ftl/game/ftl.dat.vanilla` if it's there (mods were applied on
