@@ -93,7 +93,10 @@ absolute (with `sdmc:` it looked for its images relative to `.`).
 ## Startup and exit
 
 `main_switch.c` shows each step on a text console (settings, memory, the game,
-mods, preparing mod images). Once the console has been used, the graphics
+mods, preparing mod images). With mods in `mods/` it waits 1.5 s at the mods
+step for L, which opens the mod list (`switch_mods_menu` in `mods_switch.c`) on
+that console. It's a press, not a hold: a button held while an app starts isn't
+reported to it. Once the console has been used, the graphics
 can't get a clean window in the same run, so `ftl.nro` asks the Homebrew Menu
 to start it again with `--quiet` (`envSetNextLoad`), which goes straight into
 the game. `appletLockExit` holds a close from the HOME menu until the game has
