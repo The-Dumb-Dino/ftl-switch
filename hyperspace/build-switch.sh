@@ -2,7 +2,7 @@
 # Builds Hyperspace for ftl.nro, the Switch homebrew port, as a static library that
 # switch/build.sh links in (Horizon has no dynamic loader).
 #   hyperspace/build-switch.sh   -> ~/ftl-build/hyperspace-switch/{libHyperspace.a,deps/}
-# The same Hyperspace as hyperspace/build-linux.sh (source.sh), whose buildscripts/switch/
+# The iPad game's Hyperspace (the fork and commit in source.sh), whose buildscripts/switch/
 # builds the HS_IPAD_SWITCH target (static, no vcpkg) with code memory from the host:
 # Horizon never makes code writable, so Hyperspace's hooks are written through the
 # port's second, writable view of the game's code (see docs/switch/internals.md).

@@ -1,21 +1,20 @@
-// The Linux desktop app (ftl-linux): paths, settings, import, mods, and the
-// SDL3 window it runs the game in.
+// Paths, settings.ini, the .ipa import, zip reading and the mod image overlay:
+// shared code from the Linux version this port grew out of, hence the folder
+// (platform/switch/ is the Switch app itself).
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
 
-// ---- paths ----
-// Installed: the XDG base directories. Portable (a file named "portable" next
-// to ftl-linux): everything in ftl-linux's folder.
+// ---- paths: everything in /switch/ftl/ on the SD card ----
 typedef struct {
-    bool portable;
-    char exe_dir[512];     // where ftl-linux is
-    char config_dir[512];  // $XDG_CONFIG_HOME/ftl-linux, portable: data/: settings.ini
-    char data_dir[512];    // $XDG_DATA_HOME/ftl-linux, portable: the folder itself
-    char game_dir[512];    //   game/: FTL, ftl.dat, Info.plist (imported; ftlman patches ftl.dat)
-    char saves_dir[512];   //   saves/ (portable: data/saves/): the game's Documents
-    char cache_dir[512];   // $XDG_CACHE_HOME/ftl-linux, portable: data/cache/
-    char state_dir[512];   // $XDG_STATE_HOME/ftl-linux, portable: data/logs/: logs, crash marker
+    bool portable;         // always (everything in one folder)
+    char exe_dir[512];     // /switch/ftl
+    char config_dir[512];  // settings.ini
+    char data_dir[512];    // mods/
+    char game_dir[512];    // game/: FTL, ftl.dat, Info.plist (imported; ftlman patches ftl.dat)
+    char saves_dir[512];   // saves/: the game's Documents
+    char cache_dir[512];   // cache/
+    char state_dir[512];   // logs/: session logs, crash marker
 } app_paths;
 extern app_paths g_paths;
 void paths_init(void);
@@ -67,26 +66,3 @@ const char *mods_active_index(void);  // the overlay to start the game with, or 
 bool mods_take_changed(void);         // ftl.dat changed since the last start
 bool mods_hyperspace_applied(void);
 bool mods_dat_is_pc(void);            // ftl.dat is the PC version's, not the iPad game's
-bool find_ftlman(char *out, size_t n);
-bool find_hyperspace(char *out, size_t n);  // Hyperspace for the iPad game, if installed
-int ftlman_configure(const char *ftlman_dir, const char *game_dir);  // its settings.json points at the game
-int ftlman_run(void);                 // ftl-linux --ftlman: ftlman's window (doesn't return on success)
-
-// ---- portable folder (portable.c) ----
-// A folder with ftl-linux, ftlman and the game from ipa that runs from anywhere.
-int portable_create(const char *folder, const char *ipa);  // ipa may be NULL: copies the imported game
-
-// ---- the window (plat_sdl.c) ----
-int sdl_app_init(void);   // window, GL, audio, input; 0 on success
-void sdl_app_push_options(void);
-void sdl_show_error(const char *title, const char *msg);
-void sdl_message_only(const char *title, const char *msg);  // before (without) the game window
-// A file chooser before the game window (zenity or kdialog): the chosen path, or false.
-bool sdl_pick_file(const char *title, const char *filter, char *out, size_t n);
-void sdl_toggle_fullscreen(void);
-int sdl_audio_peak(void);  // the highest sample since the last call (tests)
-
-// ---- scripted tests (testcmd.c, FTL_TEST_CMD=<fifo>) ----
-void testcmd_init(void);
-void testcmd_poll(void);
-const char *testcmd_text(void);  // the reply to give text prompts, or NULL

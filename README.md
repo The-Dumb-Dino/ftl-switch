@@ -40,7 +40,8 @@ To build `ftl.nro` yourself, see [docs/switch/building.md](docs/switch/building.
 | [Mods and Hyperspace](docs/switch/mods.md) | Mods on the console, patching big mods on a PC, Hyperspace |
 | [Building](docs/switch/building.md) | Toolchain, build steps, the icon, testing in Ryujinx |
 | [How the Switch port works](docs/switch/internals.md) | Toolchain, code memory under Horizon, ftlman and Hyperspace in one `.nro` |
-| [How it works](docs/how-it-works.md) | The shared core: the loader, the runtime, the frameworks, the hooks |
+| [How it works](docs/how-it-works.md) | The core: the loader, the runtime, the frameworks, the hooks |
+| [Testing and debugging](docs/testing.md) | Logs, the headless test harness, debug switches, tools |
 
 ## Reporting bugs
 

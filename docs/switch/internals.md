@@ -1,6 +1,6 @@
 # How the Switch port works
 
-`ftl.nro` is the same port as ftl-linux (the Mach-O loader, the Objective-C
+`ftl.nro` runs the game on the port's core (the Mach-O loader, the Objective-C
 runtime, the iOS frameworks underneath the game; see
 [../how-it-works.md](../how-it-works.md)) with a libnx platform layer in
 `native/src/platform/switch/`. This document covers what's different on the
@@ -147,7 +147,7 @@ it (it copies the table onto itself).
 
 ## Hyperspace
 
-It's the same Hyperspace as for Android and Linux, the
+It's the same Hyperspace as for the other ports of the iPad game, the
 [iPad fork](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino) (the commit in
 `hyperspace/source.sh`), built
 with its Switch target (`buildscripts/switch/` there; `hyperspace/build-switch.sh`
@@ -171,4 +171,4 @@ runs it):
   it keep logging the messages only.
 
 The new fields are optional and at the end of the structure, so the same
-Hyperspace source serves the Android app and ftl-linux, which don't pass them.
+Hyperspace source serves the ports that don't pass them.

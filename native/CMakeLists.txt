@@ -3,9 +3,8 @@ project(ftlport C ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(LIBCXX_DIR "" CACHE PATH "Apple-ABI libc++ install dir (lib/ with libc++.a, libc++abi.a, libunwind.a)")
-option(FTL_HARNESS "Build the test harness (ftlrun) instead of the desktop app (ftl-linux)" OFF)
-option(FTL_SWITCH_APP "Build the Nintendo Switch homebrew app (ftl.nro; switch/toolchain.cmake)" OFF)
-set(FTL_LINUX_VERSION "dev" CACHE STRING "Version string of ftl-linux")
+option(FTL_SWITCH_APP "Build the Nintendo Switch homebrew app (ftl.nro; switch/build.sh)" OFF)
+option(FTL_HARNESS "Build the headless test harness (ftlrun; native/build-harness.sh)" OFF)
 
 set(CORE_SOURCES
     src/loader/macho.c
@@ -67,7 +66,7 @@ if(FTL_SWITCH_APP)
         src/platform/switch/log_switch.c
         src/platform/switch/compat_switch.c
         src/platform/switch/memdiag_switch.c
-        # shared with the Linux app: settings.ini, the .ipa import, the mod image overlay
+        # shared code from the Linux version: settings.ini, the .ipa import, the mod image overlay
         src/platform/linux/settings.c
         src/platform/linux/import.c
         src/platform/linux/zip.c
@@ -142,41 +141,7 @@ if(FTL_SWITCH_APP)
         COMMAND ${ELF2NRO} $<TARGET_FILE:ftl> ftl.nro --nacp=ftl.nacp ${_icon}
         DEPENDS ftl ${_icon_dep} VERBATIM)
     add_custom_target(nro ALL DEPENDS ftl.nro)
-elseif(NOT FTL_HARNESS)
-    find_package(SDL3 REQUIRED CONFIG)
-    find_package(ZLIB REQUIRED)
-    add_executable(ftl-linux ${CORE_SOURCES}
-        src/platform/linux/main_linux.c
-        src/platform/linux/plat_sdl.c
-        src/platform/linux/settings.c
-        src/platform/linux/import.c
-        src/platform/linux/zip.c
-        src/platform/linux/mods_linux.c
-        src/platform/linux/portable.c
-        src/platform/linux/log_linux.c
-        src/platform/linux/testcmd.c)
-    target_compile_definitions(ftl-linux PRIVATE FTL_LINUX_APP FTL_LINUX_VERSION="${FTL_LINUX_VERSION}")
-    target_include_directories(ftl-linux PRIVATE include src)
-    # newer clang warns about every objc_msgSend cast (the fw/ code calls through it by design)
-    target_compile_options(ftl-linux PRIVATE ${COMMON_FLAGS} -O2 -g -Wno-cast-function-type-mismatch
-        -Wno-gnu-variable-sized-type-not-at-end -Wno-unknown-warning-option)
-    # max-page-size: loadable on 4K, 16K and 64K page kernels
-    target_link_options(ftl-linux PRIVATE -fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,--gc-sections
-        -Wl,-z,max-page-size=65536)
-    target_link_libraries(ftl-linux PRIVATE ${CXX_LIBS} SDL3::SDL3 EGL GLESv2 ZLIB::ZLIB pthread dl m)
-    install(TARGETS ftl-linux RUNTIME DESTINATION bin)
-    install(FILES linux/ftl-linux.desktop DESTINATION share/applications)
-    # ftlman (ftlman/build-linux.sh) goes where ftl-linux looks for it
-    set(FTLMAN_BIN "" CACHE FILEPATH "ftlman built for Linux, installed to libexec/ftl-linux")
-    if(FTLMAN_BIN)
-        install(PROGRAMS ${FTLMAN_BIN} DESTINATION libexec/ftl-linux)
-    endif()
-    # Hyperspace for the iPad game (hyperspace/build-linux.sh), found there by ftl-linux
-    set(HYPERSPACE_SO "" CACHE FILEPATH "Hyperspace built for Linux, installed to libexec/ftl-linux")
-    if(HYPERSPACE_SO)
-        install(FILES ${HYPERSPACE_SO} DESTINATION libexec/ftl-linux)
-    endif()
-else()
+elseif(FTL_HARNESS)
     add_executable(ftlrun ${CORE_SOURCES} src/platform/plat_linux.c src/debug/guard_alloc.c src/debug/debug_hooks.c)
     target_compile_definitions(ftlrun PRIVATE FTL_GUARD_ALLOC)
     target_include_directories(ftlrun PRIVATE include src)
@@ -185,4 +150,6 @@ else()
         -Wl,--export-dynamic-symbol=free -Wl,--export-dynamic-symbol=realloc
         -Wl,--export-dynamic-symbol=malloc -Wl,--export-dynamic-symbol=calloc)
     target_link_libraries(ftlrun PRIVATE ${CXX_LIBS} EGL GLESv2 z pthread dl m)
+else()
+    message(FATAL_ERROR "Build with switch/build.sh (ftl.nro) or native/build-harness.sh (the test harness)")
 endif()

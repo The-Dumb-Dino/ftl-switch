@@ -1,10 +1,10 @@
-// Mods, the PC way: ftlman (the PC mod manager, built for Linux) patches the
-// game's ftl.dat in place and keeps the original as ftl.dat.vanilla, just as it
-// does with FTL on PC. ftl-linux only has to notice: mods add PC-style .png
-// images, while the iPad build keeps small images in atlases, so when ftl.dat
-// has mod images the port needs the atlas lists without them (see ux/mods.c).
-// That overlay is made here at launch from whatever ftl.dat is there, and kept
-// in the cache until ftl.dat changes again.
+// What a patched ftl.dat needs at launch: ftlman (mods_switch.c, or on a PC)
+// patches the game's ftl.dat and keeps the original as ftl.dat.vanilla, as it
+// does with FTL on PC. Mods add PC-style .png images, while the iPad build keeps
+// small images in atlases, so when ftl.dat has mod images the port needs the
+// atlas lists without them (see ux/mods.c). That overlay is made here at launch
+// from whatever ftl.dat is there, and kept in the cache until ftl.dat changes
+// again. (Shared code from the Linux version this port grew out of.)
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <dirent.h>
@@ -32,11 +32,7 @@ static bool prefix_ci(const char *s, const char *p) { return !strncasecmp(s, p, 
 
 int copy_file(const char *from, const char *to, int mode) {
     FILE *in = fopen(from, "rbe");
-#ifdef __SWITCH__
     int fd = in ? open(to, O_WRONLY | O_CREAT | O_TRUNC, mode) : -1;  // no exec, and libnx refuses O_CLOEXEC
-#else
-    int fd = in ? open(to, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, mode) : -1;
-#endif
     FILE *out = fd >= 0 ? fdopen(fd, "wb") : NULL;
     if (!in || !out) {
         if (in) fclose(in);
@@ -56,12 +52,10 @@ int copy_file(const char *from, const char *to, int mode) {
     return rc;
 }
 
-// rename(from, to) over an existing to. POSIX does that in one step; on the Switch the
-// file system refuses an existing target, so it's removed first.
+// rename(from, to) over an existing to: the Switch's file system refuses an
+// existing target, so it's removed first.
 int replace_file(const char *from, const char *to) {
-#ifdef __SWITCH__
     unlink(to);
-#endif
     return rename(from, to);
 }
 
@@ -339,183 +333,3 @@ const char *mods_active_index(void) { return g_index[0] ? g_index : NULL; }
 bool mods_hyperspace_applied(void) { return g_hyperspace; }
 bool mods_take_changed(void) { return g_changed; }
 bool mods_dat_is_pc(void) { return g_pc_dat; }
-
-#ifndef __SWITCH__  // ftlman and Hyperspace run on a PC; the Switch only reads the result
-// ---------------------------------------------------------------------------
-// ftlman: settings.ini "ftlman", else next to ftl-linux (or its libexec), else PATH
-bool find_ftlman(char *out, size_t n) {
-    const char *s = setting_str("ftlman", NULL);
-    if (s && *s) {
-        snprintf(out, n, "%s", s);
-        return access(out, X_OK) == 0;
-    }
-    const char *cands[] = {"%s/ftlman/ftlman", "%s/ftlman", "%s/../libexec/ftl-linux/ftlman",
-                           "%s/../lib/ftl-linux/ftlman"};
-    for (size_t i = 0; i < sizeof cands / sizeof *cands; i++) {
-        snprintf(out, n, cands[i], g_paths.exe_dir);
-        struct stat st;
-        if (stat(out, &st) == 0 && S_ISREG(st.st_mode) && access(out, X_OK) == 0) return true;
-    }
-    const char *path = getenv("PATH");
-    char *dup = strdup(path ? path : ""), *save, *d;
-    bool ok = false;
-    for (d = strtok_r(dup, ":", &save); d && !ok; d = strtok_r(NULL, ":", &save)) {
-        snprintf(out, n, "%s/ftlman", d);
-        ok = access(out, X_OK) == 0;
-    }
-    free(dup);
-    return ok;
-}
-
-// Hyperspace for the iPad game: settings.ini's hyperspace_lib, else Hyperspace*.so or
-// libHyperspace.so in the game folder (as on PC, next to the game), next to ftl-linux,
-// or in its libexec folder.
-bool find_hyperspace(char *out, size_t n) {
-    const char *set = setting_str("hyperspace_lib", NULL);
-    if (set && *set) {
-        snprintf(out, n, "%s", set);
-        if (access(out, R_OK) == 0) return true;
-        LOGW("hyperspace_lib %s isn't there", set);
-        return false;
-    }
-    char libexec[700];
-    snprintf(libexec, sizeof libexec, "%s/../libexec/ftl-linux", g_paths.exe_dir);
-    const char *dirs[] = {g_paths.game_dir, g_paths.exe_dir, libexec};
-    for (size_t i = 0; i < 3; i++) {
-        DIR *d = opendir(dirs[i]);
-        if (!d) continue;
-        struct dirent *e;
-        char best[256] = "";
-        while ((e = readdir(d))) {
-            size_t l = strlen(e->d_name);
-            bool hs = (!strncmp(e->d_name, "Hyperspace", 10) || !strcmp(e->d_name, "libHyperspace.so")) && l > 3 &&
-                      !strcmp(e->d_name + l - 3, ".so");
-            if (hs && strcmp(e->d_name, best) > 0) snprintf(best, sizeof best, "%s", e->d_name);  // the newest name
-        }
-        closedir(d);
-        if (best[0]) {
-            snprintf(out, n, "%s/%s", dirs[i], best);
-            return true;
-        }
-    }
-    return false;
-}
-
-static void json_string(char *out, size_t n, const char *s) {
-    size_t o = 0;
-    if (o < n) out[o++] = '"';
-    for (; *s && o + 7 < n; s++) {
-        unsigned char c = (unsigned char)*s;
-        if (c == '"' || c == '\\') o += (size_t)snprintf(out + o, n - o, "\\%c", c);
-        else if (c < 0x20) o += (size_t)snprintf(out + o, n - o, "\\u%04x", c);
-        else out[o++] = (char)c;
-    }
-    if (o < n) out[o++] = '"';
-    out[o < n ? o : n - 1] = 0;
-}
-
-// ftlman's settings.json (next to it) with its FTL folder set to the game's, so
-// it finds the game even after the folder moved. Its other settings stay; new
-// ones start without the Hyperspace installer and self-update, which are for
-// the PC game and ftlman's own PC builds.
-int ftlman_configure(const char *ftlman_dir, const char *game_dir) {
-    char p[800], game[1100];
-    path_in(p, sizeof p, ftlman_dir, "settings.json");
-    json_string(game, sizeof game, game_dir);
-    char *s = read_file(p, 1 << 20);
-    char out[1 << 15];
-    const char *key = "\"ftl_directory\":";
-    char *at = s ? strstr(s, key) : NULL;
-    if (!s || !strchr(s, '{')) {
-        snprintf(out, sizeof out,
-                 "{\"mod_directory\":\"mods\",\"ftl_directory\":%s,\"dirs_are_mods\":true,\"zips_are_mods\":true,"
-                 "\"ftl_is_zip\":true,\"repack_ftl_data\":true,\"disable_hs_installer\":true,\"autoupdate\":false,"
-                 "\"warn_about_missing_hyperspace\":true}",
-                 game);
-    } else if (at) {
-        // replace the value: null or a string
-        char *v = at + strlen(key);
-        while (isspace((unsigned char)*v)) v++;
-        char *e = v;
-        if (*e == '"') {
-            for (e++; *e && *e != '"'; e++)
-                if (*e == '\\' && e[1]) e++;
-            if (*e) e++;
-        } else {
-            while (*e && *e != ',' && *e != '}') e++;
-        }
-        snprintf(out, sizeof out, "%.*s%s%s", (int)(v - s), s, game, e);
-    } else {
-        char *brace = strchr(s, '{');
-        snprintf(out, sizeof out, "%.*s\"ftl_directory\":%s,%s", (int)(brace + 1 - s), s, game, brace + 1);
-    }
-    int rc = (!s || strcmp(s, out)) ? write_file(p, out) : 0;
-    free(s);
-    return rc;
-}
-
-// ftl-linux --ftlman: ftlman's window, set up for this game. ftlman keeps its
-// settings and mods next to itself, so it runs from <data>/ftlman/ (a copy in
-// an installed setup, where its own folder is read-only or shared).
-int ftlman_run(void) {
-    char exe[PATH_MAX], dir[700], run[800];
-    if (!find_ftlman(exe, sizeof exe)) {
-        fprintf(stderr, "ftlman wasn't found. Build it with ftlman/build-linux.sh and put it in the ftlman folder\n"
-                        "next to ftl-linux, or set ftlman = /path/to/ftlman in settings.ini.\n");
-        sdl_message_only("FTL Mod Manager", "ftlman, the mod manager, isn't installed next to ftl-linux.");
-        return 1;
-    }
-    if (!import_game_present(g_paths.game_dir)) {
-        fprintf(stderr, "Import the game first (ftl-linux --import <FTL.ipa>).\n");
-        sdl_message_only("FTL Mod Manager", "Import the game first: start FTL and pick your FTL.ipa.");
-        return 1;
-    }
-    path_in(dir, sizeof dir, g_paths.data_dir, "ftlman");
-    path_in(run, sizeof run, dir, "ftlman");
-    mkdirs(dir);
-    // mods added with the old `ftl-linux --mods` (<data>/mods, with its list.txt) go to ftlman's
-    char old[700], mods[800], list[800];
-    path_in(old, sizeof old, g_paths.data_dir, "mods");
-    path_in(list, sizeof list, old, "list.txt");
-    path_in(mods, sizeof mods, dir, "mods");
-    if (access(list, F_OK) == 0 && access(mods, F_OK) != 0 && rename(old, mods) == 0) {
-        path_in(list, sizeof list, mods, "list.txt");
-        unlink(list);
-        printf("Moved your mods to %s\n", mods);
-    }
-    char *real = realpath(exe, NULL), *runreal = realpath(run, NULL);
-    bool same = real && runreal && !strcmp(real, runreal);
-    free(runreal);
-    if (!same) {  // an installed ftlman: refresh the copy when it's different
-        struct stat a, b;
-        if (stat(exe, &a) || stat(run, &b) || a.st_size != b.st_size || a.st_mtime > b.st_mtime) {
-            char tmp[900];
-            snprintf(tmp, sizeof tmp, "%s.tmp", run);
-            if (copy_file(exe, tmp, 0755) || rename(tmp, run)) {
-                fprintf(stderr, "Couldn't copy ftlman to %s\n", dir);
-                unlink(tmp);
-                free(real);
-                return 1;
-            }
-        }
-    }
-    free(real);
-    char global[700];
-    const char *cfg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
-    if (cfg && *cfg == '/') path_in(global, sizeof global, cfg, "ftlman/settings.json");
-    else snprintf(global, sizeof global, "%s/.config/ftlman/settings.json", home ? home : "");
-    if (access(global, F_OK) == 0)
-        fprintf(stderr, "Note: ftlman uses your own ftlman settings (%s), not this game's.\n"
-                        "Point its FTL directory at %s.\n", global, g_paths.game_dir);
-    if (ftlman_configure(dir, g_paths.game_dir)) fprintf(stderr, "Couldn't write %s/settings.json\n", dir);
-    if (chdir(dir) != 0) {
-        fprintf(stderr, "Can't open %s\n", dir);
-        return 1;
-    }
-    printf("Mods go in %s/mods. Apply them in ftlman, then start the game.\n", dir);
-    fflush(stdout);
-    execl(run, run, (char *)NULL);
-    fprintf(stderr, "Couldn't run %s: %s\n", run, strerror(errno));
-    return 1;
-}
-#endif

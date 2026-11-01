@@ -1,7 +1,8 @@
-// Hyperspace (the mod loader PC mods like Multiverse build on), when the player turns
-// it on: Hyperspace.1.6.21.arm64.so (hyperspace/build-linux.sh), started once the game
-// is mapped, linked and protected, before any game code runs. It hooks the game in
-// memory. Built from the Hyperspace in hyperspace/source.sh.
+// Hyperspace (the mod loader PC mods like Multiverse build on), when the applied mods
+// include it: started once the game is mapped, linked and protected, before any game
+// code runs. It hooks the game in memory. Built from the Hyperspace in
+// hyperspace/source.sh (hyperspace/build-switch.sh); the test harness loads a
+// libHyperspace.so with dlopen instead.
 // On the Switch it is linked into ftl.nro (no dynamic loader), and its code memory
 // comes from the port: code there is never made writable, it's written through the
 // game's second, writable view (execmem_switch.c).

@@ -6,10 +6,19 @@ built with clang anyway (Apple's C++ ABI). devkitPro's *target* packages
 (libnx, newlib, mesa, zlib) are built for the Switch and work with any host, so
 they're used as they are.
 
-You need what the Linux build needs for libc++ (clang/lld, CMake, Ninja,
-Python 3, `patch`, the LLVM 19.1.7 sources; see
-[../linux/building.md](../linux/building.md)), plus a nightly Rust toolchain
-for ftlman (`build-ftlman.sh` adds `rust-src`; std must use libc 0.2.191,
+You need clang/lld, CMake, Ninja, Python 3, `patch` and the LLVM 19.1.7
+sources (for libc++), plus a nightly Rust toolchain for ftlman. On Fedora:
+
+    sudo dnf install clang lld llvm cmake ninja-build python3 python3-pillow patch rustup
+    rustup-init -y --default-toolchain nightly --profile minimal
+    mkdir -p ~/src && cd ~/src
+    curl -LO https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/llvm-project-19.1.7.src.tar.xz
+    tar xf llvm-project-19.1.7.src.tar.xz
+
+On Debian/Ubuntu the packages are `clang lld llvm cmake ninja-build python3
+python3-pil patch`, with Rust from [rustup](https://rustup.rs/).
+
+ftlman (`build-ftlman.sh` adds `rust-src`; std must use libc 0.2.191,
 which the script checks), and Pillow for the icon. Then:
 
     switch/setup.sh             # once: devkitPro's target packages, elf2nro, nacptool

@@ -17,7 +17,7 @@ ROOT=${SWITCH_ROOT:-$HOME/ftl-build/switch}
 SRC=${FTLMAN_SRC:-$HOME/ftl-build/ftlman-src}
 OUT=${OUT:-$ROOT/ftlman-switch}
 REPO=https://github.com/afishhh/ftlman
-COMMIT=7ad94795f9eff7f4bf005ea40d9bb2cf4d57ec88  # v0.7.4, as ftlman/build-linux.sh
+COMMIT=7ad94795f9eff7f4bf005ea40d9bb2cf4d57ec88  # v0.7.4
 export PATH=$HOME/.cargo/bin:$PATH
 
 rustup toolchain list | grep -q "^$TOOLCHAIN" || rustup toolchain install "$TOOLCHAIN" --profile minimal
@@ -50,7 +50,7 @@ fetch_crate getrandom 0.3.3 getrandom-0.3.3
 rm -rf "$ROOT/rust-src" && mkdir -p "$ROOT/rust-src" && cp -r "$SYSROOT/lib/rustlib/src/rust/library" "$STD"
 printf '\n# ftl.nro: libc with the Switch (Horizon on aarch64, devkitPro newlib)\nlibc = { path = %s }\n' "'$CRATES/libc'" >> "$STD/Cargo.toml"
 
-# ftlman: the same release as on Linux, headless (headless.patch), plus the Switch entry
+# ftlman: that release, headless (headless.patch), plus the Switch entry (switch.patch)
 [ -d "$SRC/.git" ] || git clone "$REPO" "$SRC"
 git -C "$SRC" fetch -q origin
 git -C "$SRC" checkout -q -f "$COMMIT"

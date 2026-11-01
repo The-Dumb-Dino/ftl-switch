@@ -37,16 +37,11 @@ New or changed in this project:
   with ftlman's engine (`switch/rust/`, `ftlman/switch.patch`), Hyperspace
   linked in (its Switch target in the iPad fork, `buildscripts/switch/` there), the icon from your `.ipa`
   (`tools/ipa_icon.py`)
-- the Linux desktop app, `ftl-linux` (`native/src/platform/linux/`): SDL3
-  window, EGL/GLES 3, mouse, keyboard, touchscreen and controller input, audio,
-  dialogs, XDG paths, settings.ini, session logs, crash reports, importing the
-  game from an `.ipa`, portable folders
-- native builds on aarch64 Linux (libc++, the app, the headless harness)
+- settings.ini, importing the game from an `.ipa`, and the mod image overlay
+  (`native/src/platform/linux/`, from the Linux version this port grew out of)
+- builds on aarch64 Linux hosts (the toolchain, libc++, the headless harness)
 - a loader that works with any host page size (4K, 16K, 64K) and keeps
   executable memory behind one interface (`loader/execmem.h`)
-- mods with stock ftlman as a native Linux program (`ftlman/`)
-- Hyperspace for Linux: its Linux target in the iPad fork (`buildscripts/linux/`
-  there), the build scripts here, and the host side starting it like a drop-in
 - removal of the Android app and its code, and of code nothing calls any more
 - the documentation in `docs/`
 
@@ -55,12 +50,11 @@ New or changed in this project:
 | Component | Used for | License |
 |---|---|---|
 | [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace); built from the [`iOS-binary-ports`](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino/tree/iOS-binary-ports) branch of [FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino), which adds the Linux and Switch targets | Optional mod loader, built from source (`hyperspace/source.sh`) | GPL-3.0 |
-| [ftlman](https://github.com/afishhh/ftlman) by afishhh | Linux: the mod manager, run as its own program. Switch: its patch engine, linked into `ftl.nro` | GPL-2.0 (`ftlman/LICENSE`); see the note below |
+| [ftlman](https://github.com/afishhh/ftlman) by afishhh | Its patch engine, linked into `ftl.nro` (`ftlman/`, `switch/rust/`) | GPL-2.0 (`ftlman/LICENSE`); see the note below |
 | [LLVM](https://llvm.org/) libc++, libc++abi, libunwind 19.1.7 | The game's C++ runtime, patched (`libcxx/`) and linked in | Apache-2.0 WITH LLVM-exception |
 | [stb_image](https://github.com/nothings/stb) by Sean Barrett | PNG decoding (`native/src/third_party/`) | MIT or public domain |
-| [SDL3](https://libsdl.org/) | Window, input, audio (the system's) | zlib |
-| [zlib](https://zlib.net/) | `ftl.dat` and `.ipa` reading (the system's) | zlib |
-| Boost, Lua, minizip (via vcpkg) | Hyperspace's dependencies | BSL-1.0, MIT, zlib |
+| [zlib](https://zlib.net/) | `ftl.dat` and `.ipa` reading (devkitPro's) | zlib |
+| Boost (headers), Lua 5.3, minizip | Hyperspace's dependencies | BSL-1.0, MIT, zlib |
 | [libnx](https://github.com/switchbrew/libnx), devkitPro's newlib, mesa, zlib | The Switch build's system libraries, linked in | ISC; BSD-style; MIT; zlib |
 | The Rust standard library and ftlman's crates | ftlman's engine on the Switch | MIT / Apache-2.0 and others |
 
@@ -81,9 +75,8 @@ Foundation, version 3 (see [LICENSE](LICENSE)).
 Since the ftl-android parts don't carry "or later", the project as a whole is
 distributed under version 3 of the GPL.
 
-**ftlman in `ftl.nro`.** ftlman ships the text of the GPL version 2. On Linux
-it runs as a separate program; on the Switch its patch engine is linked into
-`ftl.nro` together with GPL-3.0 code (this project and Hyperspace), which
+**ftlman in `ftl.nro`.** ftlman ships the text of the GPL version 2. Its patch
+engine is linked into `ftl.nro` together with GPL-3.0 code (this project and Hyperspace), which
 needs ftlman under GPL version 2 "or later". It is used here on the
 understanding that its author, afishhh, agrees; his written confirmation is
 still pending. If that changes, `FTLMAN= switch/build.sh` builds `ftl.nro`

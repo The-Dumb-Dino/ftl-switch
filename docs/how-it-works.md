@@ -1,19 +1,19 @@
 # How it works
 
-Building and using it are described in the [README](../README.md),
-`docs/switch/` and `docs/linux/`. This document is about the core both share;
-what's specific to the Switch is in [switch/internals.md](switch/internals.md).
+Building and using it are described in the [README](../README.md) and
+`docs/switch/`. This document is about the core that runs the game; what's
+specific to the Switch is in [switch/internals.md](switch/internals.md).
 
 The idea, and most of the machinery described here, comes from
 [ftl-android](https://github.com/Sidd065/ftl-android) by Sidd065: the Mach-O
 loader, the Objective-C runtime, the iOS frameworks and the touch layer. This
-project took that core off Android and onto Linux and the Nintendo Switch. [CREDITS.md](../CREDITS.md) lists what came
-from where.
+project took that core off Android and onto the Nintendo Switch.
+[CREDITS.md](../CREDITS.md) lists what came from where.
 
 ## The short version
 
 Nothing is recompiled. The original arm64 iOS executable of FTL for iPad runs
-as it is, inside a normal program (a Linux program, or a Switch homebrew `.nro`):
+as it is, inside a Switch homebrew program (`ftl.nro`):
 
 1. The **Mach-O loader** maps the game's executable into memory and links its
    imports against the port's own replacements.
@@ -21,12 +21,12 @@ as it is, inside a normal program (a Linux program, or a Switch homebrew `.nro`)
    Darwin's ABI, an **Objective-C runtime** with Apple's ABI, Apple's C++
    library ABI, and small reimplementations of the **iOS frameworks** the game
    uses (UIKit, Foundation, QuartzCore/OpenGL ES, AudioToolbox, ...).
-3. A **platform layer** connects all of that to the host: SDL3 on Linux,
-   libnx on the Switch, with EGL/GLES 3 for drawing on both.
-4. A **UX layer** adds what the iPad game doesn't have on a desktop: mouse,
-   keyboard and controller input, zoom, the magnifier, and help for PC mods.
+3. A **platform layer** connects all of that to the console: libnx, with
+   EGL/GLES 3 on mesa for drawing.
+4. A **UX layer** adds what the iPad game doesn't have: controller input with
+   a cursor, zoom, the magnifier, and help for PC mods.
 
-The game believes it is on an iPad whose screen has the window's shape.
+The game believes it is on an iPad whose screen has the Switch's shape.
 
 ## Layers
 
@@ -34,9 +34,9 @@ The game believes it is on an iPad whose screen has the window's shape.
 native/src/
   platform/switch/ ftl.nro: libnx, EGL on mesa, touch, Joy-Cons, applets, code
                    memory under Horizon, mods with ftlman's engine
-  platform/linux/  ftl-linux: SDL3 window, EGL, input, audio, dialogs, settings.ini,
-                   import, portable folders, ftlman, logs (main_linux.c, plat_sdl.c);
-                   import, settings, zip reading and mods are shared with the Switch
+  platform/linux/  settings.ini, the .ipa import, zip reading, the mod image overlay
+                   (from the Linux version this port grew out of)
+  platform/plat_linux.c  the headless test harness (docs/testing.md)
   ux/              layout, zoom, gestures, magnifier, minimap, hotkeys, controller
                    cursor, mods' images and atlases, PNG
   fw/              UIKit, Foundation, QuartzCore/EAGL, AudioUnit, GameKit and
@@ -75,9 +75,9 @@ kernel (Asahi's `muvm` micro-VM), and with `FTL_PAGESIZE=65536`, which makes
 the loader act as if pages were 64K.
 
 **Executable memory** goes through `loader/execmem.h`: allocate, protect, and
-separate write and execute views of the same code. On Linux one anonymous
-mapping serves both. The Switch never allows writable code, so there the code
-is written through a second view of it
+separate write and execute views of the same code. On a POSIX system (the
+test harness) one anonymous mapping serves both. The Switch never allows
+writable code, so there the code is written through a second view of it
 ([switch/internals.md](switch/internals.md#how-the-games-code-is-mapped)).
 
 ## The Objective-C runtime (`objc/`)
@@ -128,8 +128,8 @@ A few features hook specific addresses in the 1.6.21 binary: the logger, the
 pause action, the hotkey lookup, menu and window state, the PNG reader and the
 `ftl.dat` reader for mods. `ux/game.h` has the addresses and struct offsets.
 They're only enabled when the binary's `LC_UUID` matches that build, and
-Hyperspace only starts on it. Other versions run without them;
-`ftl-linux --info` shows the version and whether it gets them. Hook stubs jump
+Hyperspace only starts on it. Other versions run without them; the session
+log says which version it is and whether it gets them. Hook stubs jump
 through `x17`, so Hyperspace can hook the same functions.
 
 The UX layer (`ux/ux.c`, `pad.c`, `overlay.c`, `targets.c`) works on the game
@@ -164,10 +164,9 @@ shown.
 For mods' right clicks, `ux.c` asks it whether a script listens for the right
 button (`hs_android_wants_right_click`) and, if so, sends it the touch gesture
 (one finger held, a tap with another) and the mouse's right button
-(`hs_android_right_button`). `hyperspace/` builds it with the fork's
-`buildscripts/linux/` (on the Switch `buildscripts/switch/`, and it is linked in, see
+(`hs_android_right_button`). `hyperspace/build-switch.sh` builds it with the
+fork's `buildscripts/switch/`, and it is linked into `ftl.nro` (see
 [switch/internals.md](switch/internals.md#hyperspace)).
 
 The `hs_android_*` names and the `HS_ANDROID` code paths are the fork's: one
-Hyperspace source serves the Android app, ftl-linux and the Switch port, with the
-same interface.
+Hyperspace source serves every port of the iPad game, with the same interface.

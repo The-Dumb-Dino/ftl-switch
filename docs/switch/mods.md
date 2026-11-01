@@ -5,8 +5,8 @@
 Put mods (`.ftl` or `.zip` files, or unpacked mod folders) in
 `sdmc:/switch/ftl/mods/` and start FTL: when that set of mods changed since the
 last start, they're applied right there, with progress on the screen, by
-ftlman's own patch engine built into `ftl.nro` (the same results as ftlman on PC
-and Linux). Then the game starts with them.
+ftlman's own patch engine built into `ftl.nro` (the same results as ftlman on
+a PC). Then the game starts with them.
 
 - Order: `Hyperspace.ftl` first, then the order in `mods/order.txt` if there is
   one (one file name per line, `-name` for a mod that's off; mods it doesn't

@@ -1,4 +1,5 @@
-// Paths (XDG base directories, or the portable folder) and settings.ini for the Linux app.
+// Paths (the app's folder on the SD card) and settings.ini. Shared code from the
+// Linux version this port grew out of, hence the folder.
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
@@ -28,17 +29,8 @@ int mkdirs(const char *path) {
     return mkdir(p, 0755) != 0 && errno != EEXIST ? -1 : 0;
 }
 
-// $VAR if set and absolute, else $HOME/fallback
-static void xdg(char *out, size_t n, const char *var, const char *fallback) {
-    const char *v = getenv(var);
-    const char *home = getenv("HOME");
-    if (v && v[0] == '/') snprintf(out, n, "%s/ftl-linux", v);
-    else snprintf(out, n, "%s/%s/ftl-linux", home ? home : ".", fallback);
-}
-
 void paths_init(void) {
     app_paths *p = &g_paths;
-#ifdef __SWITCH__
     // Everything in the app's own folder on the SD card, like a portable folder.
     // Written without "sdmc:": the SD card is libnx's default device, and the
     // game only takes paths that start with "/" as absolute.
@@ -50,33 +42,6 @@ void paths_init(void) {
     snprintf(p->saves_dir, sizeof p->saves_dir, "%s/saves", p->exe_dir);
     snprintf(p->cache_dir, sizeof p->cache_dir, "%s/cache", p->exe_dir);
     snprintf(p->state_dir, sizeof p->state_dir, "%s/logs", p->exe_dir);
-    return;
-#endif
-    char self[PATH_MAX];
-    ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
-    self[l > 0 ? l : 0] = 0;
-    char *slash = strrchr(self, '/');
-    if (slash) *slash = 0;
-    snprintf(p->exe_dir, sizeof p->exe_dir, "%s", self[0] ? self : ".");
-    char marker[600];
-    snprintf(marker, sizeof marker, "%s/portable", p->exe_dir);
-    struct stat st;
-    p->portable = stat(marker, &st) == 0 && S_ISREG(st.st_mode);
-    if (p->portable) {
-        snprintf(p->data_dir, sizeof p->data_dir, "%s", p->exe_dir);
-        snprintf(p->config_dir, sizeof p->config_dir, "%s/data", p->exe_dir);
-        snprintf(p->saves_dir, sizeof p->saves_dir, "%s/data/saves", p->exe_dir);
-        snprintf(p->cache_dir, sizeof p->cache_dir, "%s/data/cache", p->exe_dir);
-        snprintf(p->state_dir, sizeof p->state_dir, "%s/data/logs", p->exe_dir);
-        snprintf(p->game_dir, sizeof p->game_dir, "%s/game", p->exe_dir);
-        return;
-    }
-    xdg(p->config_dir, sizeof p->config_dir, "XDG_CONFIG_HOME", ".config");
-    xdg(p->data_dir, sizeof p->data_dir, "XDG_DATA_HOME", ".local/share");
-    xdg(p->cache_dir, sizeof p->cache_dir, "XDG_CACHE_HOME", ".cache");
-    xdg(p->state_dir, sizeof p->state_dir, "XDG_STATE_HOME", ".local/state");
-    snprintf(p->game_dir, sizeof p->game_dir, "%s/game", p->data_dir);
-    snprintf(p->saves_dir, sizeof p->saves_dir, "%s/saves", p->data_dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,47 +138,6 @@ int setting_tristate(const char *key) {
     return parse_bool(v);  // "auto" and anything else: -1
 }
 
-#ifndef __SWITCH__
-static const char DEFAULT_SETTINGS[] =
-    "# ftl-linux settings. Lines starting with # are comments; delete a line to get its default.\n"
-    "\n"
-    "# Window\n"
-    "fullscreen = false          # F11 or Alt+Enter switches while playing\n"
-    "window_width = 0            # 0: 80% of the screen, with the screen's shape (so fullscreen fits)\n"
-    "window_height = 0\n"
-    "vsync = true\n"
-    "render_height = 0           # 0: automatic (1536 on big windows, else 768); or 768 / 1536\n"
-    "pause_on_focus_loss = true  # minimizing always pauses\n"
-    "\n"
-    "# Touch helpers: auto = off with a mouse, on once a touchscreen is used\n"
-    "magnifier = auto            # the loupe over your finger\n"
-    "pinch_zoom = auto           # two fingers zoom and pan (the mouse wheel always zooms)\n"
-    "auto_zoom = auto            # zoom in on the map and the upgrade screen\n"
-    "event_zoom = false          # zoom in on events too\n"
-    "minimap = true              # where you are while zoomed in\n"
-    "two_finger_pause = true\n"
-    "event_text = 0              # event text size: 0 the game's, 1 large, 2 larger\n"
-    "resume_run = false          # continue the saved run at launch\n"
-    "\n"
-    "# Game controller\n"
-    "pad_magnetism = true        # the cursor is drawn to buttons\n"
-    "pad_rumble = true\n"
-    "pad_touchpad = true         # a DualSense/DualShock touchpad moves the cursor\n"
-    "# Buttons: pad_<a|b|x|y|lb|rb|lt|rt|l3|r3|start|select|home> = <none|tap|right_click|back|pause|\n"
-    "#   zoom_in|zoom_out|reset_zoom|magnifier|turbo|precision>. Defaults:\n"
-    "# pad_a = tap\n"
-    "# pad_b = back\n"
-    "# pad_start = back\n"
-    "# pad_x = pause\n"
-    "# pad_lb = zoom_out\n"
-    "# pad_rb = zoom_in\n"
-    "# pad_lt = magnifier\n"
-    "# pad_rt = right_click\n"
-    "# pad_select = reset_zoom\n"
-    "# pad_r3 = reset_zoom\n";
-#endif
-
-#ifdef __SWITCH__
 static const char DEFAULT_SETTINGS[] =
     "# FTL for Switch settings. Lines starting with # are comments; delete a line to get its default.\n"
     "\n"
@@ -247,7 +171,6 @@ static const char DEFAULT_SETTINGS[] =
     "allow_applet_mode = false   # start from the Album too (little memory: may crash)\n"
     "check_updates = true        # release builds: offer new versions from GitHub at start\n"
     "verbose = false             # more detail in logs/\n";
-#endif
 
 void settings_write_default(const char *path) {
     struct stat st;
