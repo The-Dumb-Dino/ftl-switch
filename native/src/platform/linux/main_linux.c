@@ -103,6 +103,10 @@ static int info(void) {
     import_plist_version(plist, ver, sizeof ver);
     printf("FTL for iPad %s, %s\n", ver[0] ? ver : "(version unknown)",
            import_is_known_build(bin) ? "the 1.6.21 build (all features)" : "another build (no game hooks)");
+    char hs[1024];
+    mods_prepare();
+    printf("Hyperspace: %s%s\n", find_hyperspace(hs, sizeof hs) ? hs : "not installed",
+           mods_hyperspace_applied() ? " (the applied mods use it)" : "");
     return 0;
 }
 
@@ -190,17 +194,19 @@ int main(int argc, char **argv) {
     bool mods_changed = mods_take_changed();
     ux_set_option("resume_run", !crashed && !mods_changed && setting_bool("resume_run", false));
 
+    // Hyperspace, while the applied mods include it (data/hyperspace.xml in ftl.dat)
     const char *hs = NULL;
-    char hs_path[600];
-    const char *hs_lib = setting_str("hyperspace_lib", NULL);
-    if (hs_lib && *hs_lib && mods_hyperspace_applied()) {
-        snprintf(hs_path, sizeof hs_path, "%s", hs_lib);
-        hs = hs_path;
-    } else if (mods_hyperspace_applied()) {
-        LOGW("the applied mods need Hyperspace, but no hyperspace_lib is set in settings.ini");
-        if (mods_changed)
-            sdl_show_error("FTL", "The mods applied with ftlman need Hyperspace, which this port doesn't have.\n\n"
-                                  "The game may not work right: in ftlman, untick those mods and Apply.");
+    char hs_path[1024];
+    if (mods_hyperspace_applied()) {
+        if (find_hyperspace(hs_path, sizeof hs_path)) {
+            hs = hs_path;
+        } else {
+            LOGW("the applied mods need Hyperspace, but there's no Hyperspace*.so");
+            if (mods_changed)
+                sdl_show_error("FTL", "The mods applied with ftlman need Hyperspace, and it isn't installed.\n\n"
+                                      "Put Hyperspace.1.6.21.arm64.so (built with hyperspace/build-linux.sh) in the\n"
+                                      "game folder, or untick those mods in ftlman and Apply.");
+        }
     }
     port_install_crash_handler();
     port_config cfg = {bin, g_paths.game_dir, g_paths.saves_dir, g_paths.cache_dir, "iPad8,1", verbose,

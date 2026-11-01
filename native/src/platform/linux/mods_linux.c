@@ -7,6 +7,7 @@
 // in the cache until ftl.dat changes again.
 #define _GNU_SOURCE
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -342,6 +343,40 @@ bool find_ftlman(char *out, size_t n) {
     }
     free(dup);
     return ok;
+}
+
+// Hyperspace for the iPad game: settings.ini's hyperspace_lib, else Hyperspace*.so or
+// libHyperspace.so in the game folder (as on PC, next to the game), next to ftl-linux,
+// or in its libexec folder.
+bool find_hyperspace(char *out, size_t n) {
+    const char *set = setting_str("hyperspace_lib", NULL);
+    if (set && *set) {
+        snprintf(out, n, "%s", set);
+        if (access(out, R_OK) == 0) return true;
+        LOGW("hyperspace_lib %s isn't there", set);
+        return false;
+    }
+    char libexec[700];
+    snprintf(libexec, sizeof libexec, "%s/../libexec/ftl-linux", g_paths.exe_dir);
+    const char *dirs[] = {g_paths.game_dir, g_paths.exe_dir, libexec};
+    for (size_t i = 0; i < 3; i++) {
+        DIR *d = opendir(dirs[i]);
+        if (!d) continue;
+        struct dirent *e;
+        char best[256] = "";
+        while ((e = readdir(d))) {
+            size_t l = strlen(e->d_name);
+            bool hs = (!strncmp(e->d_name, "Hyperspace", 10) || !strcmp(e->d_name, "libHyperspace.so")) && l > 3 &&
+                      !strcmp(e->d_name + l - 3, ".so");
+            if (hs && strcmp(e->d_name, best) > 0) snprintf(best, sizeof best, "%s", e->d_name);  // the newest name
+        }
+        closedir(d);
+        if (best[0]) {
+            snprintf(out, n, "%s/%s", dirs[i], best);
+            return true;
+        }
+    }
+    return false;
 }
 
 static void json_string(char *out, size_t n, const char *s) {

@@ -72,6 +72,7 @@ bool mods_take_changed(void);         // ftl.dat changed since the last start
 bool mods_hyperspace_applied(void);
 bool mods_present(void);              // ftl.dat has mods in it
 bool find_ftlman(char *out, size_t n);
+bool find_hyperspace(char *out, size_t n);  // Hyperspace for the iPad game, if installed
 int ftlman_configure(const char *ftlman_dir, const char *game_dir);  // its settings.json points at the game
 int ftlman_run(void);                 // ftl-linux --ftlman: ftlman's window (doesn't return on success)
 

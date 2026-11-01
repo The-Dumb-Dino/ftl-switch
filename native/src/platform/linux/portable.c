@@ -2,7 +2,7 @@
 // and runs from wherever it's put (another disk, a USB stick, another user):
 //   ftl-linux, portable (the marker), game/ (from the .ipa), ftlman/ftlman,
 //   data/ (settings, saves, logs, cache; made on the first start),
-//   mod-manager, FTL.desktop, README.txt
+//   mod-manager, FTL.desktop, README.txt, and Hyperspace*.so if there is one
 // Without an .ipa, the game already imported here is copied in.
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -102,8 +102,10 @@ static const char README[] =
     "\n"
     "Moving the folder is fine; copy it whole. It needs a 64-bit ARM Linux\n"
     "(aarch64) with SDL3 and OpenGL ES (Mesa); any kernel page size.\n"
-    "Mods that need Hyperspace (Multiverse and others) don't work: Hyperspace is\n"
-    "made for the PC game. Turn off ftlman's Hyperspace installer if it asks.\n"
+    "Hyperspace (for Multiverse and other big mods): Hyperspace.1.6.21.arm64.so\n"
+    "next to ftl-linux, or in game/. It's used while the applied mods include it;\n"
+    "delete the file to uninstall. ftlman's own Hyperspace installer is for the PC\n"
+    "game and stays off.\n"
     "\n"
     "The game files are your own copy: don't share this folder with game/ in it.\n";
 
@@ -173,6 +175,13 @@ int portable_create(const char *folder, const char *ipa) {
     if (have_ftlman && put(ftlman, p, 0755)) return 1;
     snprintf(p, sizeof p, "%s/game", dir);
     ftlman_configure(q, p);
+    // Hyperspace next to ftl-linux, where a new import of game/ leaves it alone
+    char hs[PATH_MAX];
+    if (find_hyperspace(hs, sizeof hs)) {
+        const char *name = strrchr(hs, '/') ? strrchr(hs, '/') + 1 : hs;
+        snprintf(p, sizeof p, "%s/%s", dir, name);
+        if (put(hs, p, 0644)) return 1;
+    }
     snprintf(p, sizeof p, "%s/data", dir);
     mkdirs(p);
     if (write_text(dir, "portable", MARKER, 0644) || write_text(dir, "mod-manager", MOD_MANAGER, 0755) ||
