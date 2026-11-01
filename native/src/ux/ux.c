@@ -137,7 +137,7 @@ static int hotkey_lookup(const void *action) {
 static const uint8_t KNOWN_UUID[16] = {0x87, 0x3d, 0x2b, 0x34, 0xd7, 0x07, 0x3d, 0x6b,
                                        0xab, 0x83, 0x26, 0x7b, 0xf4, 0xc5, 0xbb, 0xc0};
 static bool image_is_known_build(mo_image *img) {
-    const uint8_t *h = mo_ptr(img, 0x100000000ull);
+    const uint8_t *h = mo_rptr(img, 0x100000000ull);
     if (!h || *(const uint32_t *)h != 0xfeedfacfu) return false;
     uint32_t ncmds = *(const uint32_t *)(h + 16);
     const uint8_t *lc = h + 32;
@@ -156,12 +156,12 @@ int ux_patches_apply(mo_image *img) {
     }
     g_img = img;
     int fails = 0;
-    uint32_t *log_fn = mo_ptr(img, G_LOG_FN);
+    const uint32_t *log_fn = mo_rptr(img, G_LOG_FN);
     if (*log_fn == 0xD65F03C0u)  // ret: expected build
         fails += patch_branch(img, G_LOG_FN, (void *)game_log_tramp) != 0;
     else
         LOGW("ux: unexpected code at game logger; not hooking");
-    uint32_t *hk = mo_ptr(img, G_HOTKEY);
+    const uint32_t *hk = mo_rptr(img, G_HOTKEY);
     if (hk[0] == 0x52800000u && hk[1] == 0xD65F03C0u)  // mov w0, #0; ret
         fails += patch_branch(img, G_HOTKEY, (void *)hotkey_lookup) != 0;
     else

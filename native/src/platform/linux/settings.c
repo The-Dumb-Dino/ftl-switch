@@ -20,6 +20,7 @@ int mkdirs(const char *path) {
     snprintf(p, sizeof p, "%s", path);
     for (char *s = p + 1; *s; s++) {
         if (*s != '/') continue;
+        if (s[-1] == ':') continue;  // a device root ("sdmc:/" on the Switch)
         *s = 0;
         if (mkdir(p, 0755) != 0 && errno != EEXIST) return -1;
         *s = '/';
@@ -37,6 +38,20 @@ static void xdg(char *out, size_t n, const char *var, const char *fallback) {
 
 void paths_init(void) {
     app_paths *p = &g_paths;
+#ifdef __SWITCH__
+    // Everything in the app's own folder on the SD card, like a portable folder.
+    // Written without "sdmc:": the SD card is libnx's default device, and the
+    // game only takes paths that start with "/" as absolute.
+    p->portable = true;
+    snprintf(p->exe_dir, sizeof p->exe_dir, "/switch/ftl");
+    snprintf(p->data_dir, sizeof p->data_dir, "%s", p->exe_dir);
+    snprintf(p->config_dir, sizeof p->config_dir, "%s", p->exe_dir);
+    snprintf(p->game_dir, sizeof p->game_dir, "%s/game", p->exe_dir);
+    snprintf(p->saves_dir, sizeof p->saves_dir, "%s/saves", p->exe_dir);
+    snprintf(p->cache_dir, sizeof p->cache_dir, "%s/cache", p->exe_dir);
+    snprintf(p->state_dir, sizeof p->state_dir, "%s/logs", p->exe_dir);
+    return;
+#endif
     char self[PATH_MAX];
     ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
     self[l > 0 ? l : 0] = 0;
@@ -158,6 +173,7 @@ int setting_tristate(const char *key) {
     return parse_bool(v);  // "auto" and anything else: -1
 }
 
+#ifndef __SWITCH__
 static const char DEFAULT_SETTINGS[] =
     "# ftl-linux settings. Lines starting with # are comments; delete a line to get its default.\n"
     "\n"
@@ -195,6 +211,42 @@ static const char DEFAULT_SETTINGS[] =
     "# pad_rt = right_click\n"
     "# pad_select = reset_zoom\n"
     "# pad_r3 = reset_zoom\n";
+#endif
+
+#ifdef __SWITCH__
+static const char DEFAULT_SETTINGS[] =
+    "# FTL for Switch settings. Lines starting with # are comments; delete a line to get its default.\n"
+    "\n"
+    "docked_1080p = true         # docked: draw at 1080p (else 720p, scaled up by the console)\n"
+    "render_height = 0           # 0: automatic; or 768 / 1536\n"
+    "\n"
+    "# Touch helpers\n"
+    "magnifier = false           # the loupe over a held finger (ZL shows it either way)\n"
+    "two_finger_pause = true\n"
+    "event_text = 0              # event text size: 0 the game's, 1 large, 2 larger\n"
+    "resume_run = false          # continue the saved run at launch\n"
+    "\n"
+    "# Controllers (A confirms, B goes back)\n"
+    "pad_magnetism = true        # the cursor is drawn to buttons\n"
+    "pad_rumble = true\n"
+    "# Buttons: pad_<a|b|x|y|l|r|zl|zr|lstick|rstick|plus|minus> = <none|tap|right_click|back|pause|\n"
+    "#   zoom_in|zoom_out|reset_zoom|magnifier|turbo|precision>. Defaults:\n"
+    "# pad_a = tap\n"
+    "# pad_b = back\n"
+    "# pad_plus = back\n"
+    "# pad_x = pause\n"
+    "# pad_zl = magnifier\n"
+    "# pad_zr = right_click\n"
+    "\n"
+    "# Zoom (off: the whole game fits the screen). zoom = true turns on two-finger pinch\n"
+    "# and pan, zooming in on the map and the upgrade screen, the minimap, and L/R zoom,\n"
+    "# -/right stick reset. Then pinch_zoom, auto_zoom, event_zoom, minimap = true/false\n"
+    "# pick among them.\n"
+    "zoom = false\n"
+    "\n"
+    "allow_applet_mode = false   # start from the Album too (little memory: may crash)\n"
+    "verbose = false             # more detail in logs/\n";
+#endif
 
 void settings_write_default(const char *path) {
     struct stat st;

@@ -1,0 +1,47 @@
+diff -ru a/libunwind/src/AddressSpace.hpp b/libunwind/src/AddressSpace.hpp
+--- a/libunwind/src/AddressSpace.hpp	2026-10-30 07:43:01.184497322 +0100
++++ b/libunwind/src/AddressSpace.hpp	2026-10-30 07:43:33.027533571 +0100
+@@ -523,6 +523,21 @@
+   }
+ 
+ #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(_LIBUNWIND_IS_BAREMETAL)
++#if defined(_LIBUNWIND_FTL_MACHO)
++  {
++    uintptr_t mh = 0, cu = 0, eh = 0, textlen = 0;
++    size_t culen = 0, ehlen = 0;
++    memset(&info, 0, sizeof(info));
++    if (__ftl_find_macho_unwind(targetAddr, &mh, &textlen, &cu, &culen, &eh, &ehlen)) {
++      info.dso_base = mh;
++      info.compact_unwind_section = cu;
++      info.compact_unwind_section_length = culen;
++      info.dwarf_section = eh;
++      info.dwarf_section_length = ehlen;
++      return true;
++    }
++  }
++#endif
+   info.dso_base = 0;
+   // Bare metal is statically linked, so no need to ask the dynamic loader
+   info.dwarf_section_length = (size_t)(&__eh_frame_end - &__eh_frame_start);
+@@ -662,7 +677,6 @@
+     memset(&info, 0, sizeof(info));
+     if (__ftl_find_macho_unwind(targetAddr, &mh, &textlen, &cu, &culen, &eh, &ehlen)) {
+       info.dso_base = mh;
+-      info.text_segment_length = textlen;
+       info.compact_unwind_section = cu;
+       info.compact_unwind_section_length = culen;
+       info.dwarf_section = eh;
+diff -ru a/libunwind/src/config.h b/libunwind/src/config.h
+--- a/libunwind/src/config.h	2026-10-30 07:43:01.183222495 +0100
++++ b/libunwind/src/config.h	2026-10-30 07:43:01.192793926 +0100
+@@ -35,6 +35,10 @@
+     #define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
+   #endif
+ #elif defined(_LIBUNWIND_IS_BAREMETAL)
++  #if defined(_LIBUNWIND_FTL_MACHO)
++    // FTL port (Switch): also unwind through the manually loaded Mach-O image.
++    #define _LIBUNWIND_SUPPORT_COMPACT_UNWIND 1
++  #endif
+   #if !defined(_LIBUNWIND_ARM_EHABI)
+     #define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
+     #define _LIBUNWIND_SUPPORT_DWARF_INDEX 1

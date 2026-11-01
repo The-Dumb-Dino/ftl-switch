@@ -5,7 +5,6 @@
 #include "symbols.h"
 
 #include <ctype.h>
-#include <dlfcn.h>
 #include <fcntl.h>
 #include <math.h>
 #include <sched.h>
@@ -30,7 +29,7 @@ X(darwin_open) X(darwin_fcntl) X(darwin_sprintf_chk) X(darwin_asprintf) X(darwin
 X(darwin_printf) X(darwin_fprintf) X(darwin_sscanf) X(darwin_setjmp) X(darwin_longjmp) X(darwin_sincosf_stret)
 X(darwin_sincos_stret) X(darwin_NSLog)
 X(darwin___error) X(darwin_stat) X(darwin_lstat) X(darwin_fstat) X(darwin_opendir) X(darwin_readdir)
-X(darwin_closedir) X(darwin_fopen) X(darwin_mkdir) X(darwin_assert_rtn) X(darwin_stack_chk_guard)
+X(darwin_closedir) X(darwin_fopen) X(darwin_rename) X(darwin_mkdir) X(darwin_assert_rtn) X(darwin_stack_chk_guard)
 X(darwin_stack_chk_fail) X(darwin_memcpy_chk) X(darwin_memmove_chk) X(darwin_memset_chk)
 X(darwin_memset_pattern16) X(darwin_bzero) X(darwin_exp10) X(darwin_OSMemoryBarrier) X(darwin_rand)
 X(darwin_srand) X(darwin_sysconf) X(darwin_sysctlbyname) X(darwin_dyld_register_func_for_add_image)
@@ -102,7 +101,7 @@ static const sym_entry g_syms[] = {
     S(cosf), S(cos), S(sin), S(tan), S(dup), S(expf), S(exp), S(fclose), S(fmod), S(fmodf), S(fread), S(fwrite),
     S(fseek), S(ftell), S(fflush), S(fgets), S(fputs), S(free), D(gettimeofday, darwin_gettimeofday), S(ldexpf), S(log10), S(log10f),
     S(logf), S(log), D(lseek, darwin_lseek), S(malloc), S(memchr), S(memcmp), S(memcpy), S(memmove), S(memset), S(nanosleep),
-    S(pow), S(powf), D(pread, darwin_pread), S(qsort), D(read, darwin_read), S(realloc), S(rename), S(sched_yield), S(sinf), S(sqrt), S(sqrtf),
+    S(pow), S(powf), D(pread, darwin_pread), S(qsort), D(read, darwin_read), S(realloc), D(rename, darwin_rename), S(sched_yield), S(sinf), S(sqrt), S(sqrtf),
     S(strcasecmp), S(strcat), S(strchr), S(strcmp), S(strcpy), S(strcspn), S(strdup), S(strlen), S(strncasecmp),
     S(strncmp), S(strncpy), S(strrchr), S(strspn), S(strstr), S(strtof), S(strtod), S(strtol), S(strtoul),
     S(strtoll), S(strtoull), S(tanf), S(time), S(unlink), S(write), S(floorf), S(ceilf), S(floor), S(ceil),

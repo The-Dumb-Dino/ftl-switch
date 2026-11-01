@@ -107,7 +107,9 @@ static int oflags_from_darwin(int f) {
     if (f & D_O_TRUNC) r |= O_TRUNC;
     if (f & D_O_EXCL) r |= O_EXCL;
     if (f & D_O_DIRECTORY) r |= O_DIRECTORY;
+#ifndef __SWITCH__  // libnx refuses O_CLOEXEC (and has no exec); the game asks for it on its saves
     if (f & D_O_CLOEXEC) r |= O_CLOEXEC;
+#endif
     return r;
 }
 static int oflags_to_darwin(int f) {
@@ -230,6 +232,7 @@ typedef struct { DIR *dir; struct darwin_dirent ent; } darwin_DIR;
 
 void *darwin_opendir(const char *path) {
     DIR *d = opendir(path);
+    LOGV("opendir(%s) = %p", path, (void *)d);
     if (!d) return NULL;
     darwin_DIR *w = calloc(1, sizeof(*w));
     w->dir = d;
@@ -242,6 +245,7 @@ struct darwin_dirent *darwin_readdir(void *vd) {
     w->ent.d_ino = e->d_ino;
     w->ent.d_seekoff = 0;
     w->ent.d_type = e->d_type;  // DT_* values match
+    LOGV("readdir: %s (type %d)", e->d_name, e->d_type);
     size_t n = strlen(e->d_name);
     if (n > 1023) n = 1023;
     memcpy(w->ent.d_name, e->d_name, n);
@@ -261,6 +265,16 @@ FILE *darwin_fopen(const char *path, const char *mode) {
     FILE *f = fopen(path, mode);
     LOGV("fopen(%s, %s) = %p", path, mode, (void *)f);
     return f;
+}
+
+// rename(2) replaces an existing target; the Switch's file system refuses instead.
+int darwin_rename(const char *from, const char *to) {
+    int r = rename(from, to);
+#ifdef __SWITCH__
+    if (r != 0 && access(from, F_OK) == 0 && access(to, F_OK) == 0 && unlink(to) == 0) r = rename(from, to);
+#endif
+    if (r != 0) LOGW("rename(%s, %s): %s", from, to, strerror(errno));
+    return r;
 }
 
 int darwin_mkdir(const char *path, int mode) {
@@ -580,10 +594,15 @@ int darwin_pthread_create(pthread_t *th, const d_attr_t *a, void *(*fn)(void *),
 int darwin_pthread_join(pthread_t th, void **ret) { return pthread_join(th, ret); }
 pthread_t darwin_pthread_self(void) { return pthread_self(); }
 int darwin_pthread_setname_np(const char *name) {
+#ifdef __SWITCH__
+    (void)name;  // Horizon threads have no names
+    return 0;
+#else
     char buf[16];
     strncpy(buf, name, 15);
     buf[15] = 0;
     return pthread_setname_np(pthread_self(), buf);
+#endif
 }
 int darwin_pthread_getschedparam(pthread_t th, int *policy, int *param) {
     (void)th;
@@ -646,8 +665,19 @@ int darwin_mach_timebase_info(uint32_t *info) {
     return 0;
 }
 int darwin_mach_wait_until(uint64_t deadline) {
+#ifdef __SWITCH__
+    // newlib has no clock_nanosleep: sleep for what's left
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t t = (uint64_t)now.tv_sec * 1000000000ull + (uint64_t)now.tv_nsec;
+    if (deadline > t) {
+        struct timespec ts = {(time_t)((deadline - t) / 1000000000ull), (long)((deadline - t) % 1000000000ull)};
+        nanosleep(&ts, NULL);
+    }
+#else
     struct timespec ts = {(time_t)(deadline / 1000000000ull), (long)(deadline % 1000000000ull)};
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL) == EINTR) {}
+#endif
     return 0;
 }
 uint32_t darwin_mach_task_self_ = 0x103;
@@ -659,6 +689,14 @@ int darwin_host_page_size(uint32_t host, uintptr_t *size) {
 }
 
 static void read_meminfo(uint64_t *total, uint64_t *avail) {
+#ifdef __SWITCH__
+    // what the kernel gives this app, and what of it is still free
+    long free_mb, total_mb, used_mb;
+    port_memory(&free_mb, &total_mb, &used_mb);
+    *total = (uint64_t)total_mb << 20;
+    *avail = (uint64_t)free_mb << 20;
+    return;
+#endif
     *total = (uint64_t)sysconf(_SC_PHYS_PAGES) * (uint64_t)sysconf(_SC_PAGESIZE);
     *avail = *total / 2;
     FILE *f = fopen("/proc/meminfo", "r");
@@ -691,7 +729,14 @@ int darwin_host_statistics(uint32_t host, int flavor, int32_t *info, uint32_t *c
 int darwin_task_info(uint32_t task, int flavor, int32_t *info, uint32_t *count) {
     (void)task;
     long rss_pages = 0;
+#ifdef __SWITCH__
+    long free_mb, total_mb, used_mb;
+    port_memory(&free_mb, &total_mb, &used_mb);
+    rss_pages = (used_mb << 20) / 4096;
+    FILE *f = NULL;
+#else
     FILE *f = fopen("/proc/self/statm", "r");
+#endif
     if (f) {
         long sz;
         if (fscanf(f, "%ld %ld", &sz, &rss_pages) != 2) rss_pages = 0;

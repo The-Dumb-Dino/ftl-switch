@@ -28,6 +28,12 @@ int execmem_protect(execmem *m, size_t off, size_t len, int prot);
 
 void execmem_free(execmem *m);
 
-static inline void *execmem_to_rw(const execmem *m, const void *rx) {
-    return m->rw + ((const uint8_t *)rx - m->rx);
-}
+// The writable address of rx. POSIX: the same mapping. Switch: the heap copy
+// before execmem_protect; afterwards the code's second, writable view (code
+// stays patchable while it runs), and the data itself.
+void *execmem_to_rw(const execmem *m, const void *rx);
+
+// Writes n bytes of code at rx while it may be running (through the writable
+// view on hosts that have one, else by making the page writable for a moment)
+// and makes them visible to instruction fetch. 0 on success.
+int execmem_write_code(execmem *m, void *rx, const void *src, size_t n);

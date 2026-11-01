@@ -30,18 +30,18 @@ static void write_abs_jump(uint32_t *p, void *target) {
 }
 
 void *patch_hook(mo_image *img, uint64_t addr, void *hook, int want_original) {
-    uint32_t *code = mo_ptr(img, addr), *wcode = mo_wptr(img, addr);
+    uint32_t *code = mo_ptr(img, addr), *wcode = mo_wptr(img, addr);  // code: the address; wcode: the bytes
     void *orig = NULL;
     if (want_original) {
         for (int i = 0; i < 4; i++)
-            if (is_pc_relative(code[i])) {
-                LOGE("patch_hook %#lx: instruction %d is pc-relative (%08x)", (unsigned long)addr, i, code[i]);
+            if (is_pc_relative(wcode[i])) {
+                LOGE("patch_hook %#lx: instruction %d is pc-relative (%08x)", (unsigned long)addr, i, wcode[i]);
                 return NULL;
             }
         uint32_t *t = mo_tramp_alloc(img, 32);
         if (!t) return NULL;
         uint32_t *wt = execmem_to_rw(&img->mem, t);
-        memcpy(wt, code, 16);
+        memcpy(wt, wcode, 16);
         write_abs_jump(wt + 4, code + 4);
         orig = t;
     }

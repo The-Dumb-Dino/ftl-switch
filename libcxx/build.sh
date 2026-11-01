@@ -4,6 +4,8 @@
 # Darwin ctype masks, and libunwind able to walk Mach-O compact-unwind frames.
 #   ./build.sh linux     -> out/linux/lib/*.a   (aarch64 glibc: native build on an
 #                           aarch64 host, else cross with SYSROOT=~/arm64-root)
+#   ./build.sh switch    -> out/switch/lib/*.a  (Switch homebrew: newlib + libnx, with
+#                           switch/toolchain.cmake; run switch/setup.sh first)
 set -euo pipefail
 TARGET=${1:-linux}
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -13,12 +15,19 @@ BUILD=${LIBCXX_BUILD:-$HOME/ftl-build/libcxx-build}-$TARGET
 ABI_DEFINES="_LIBCPP_ABI_ALTERNATE_STRING_LAYOUT"
 # -fc++-abi=arm: constructors/destructors return `this` like Apple arm64 (callers rely on it)
 EXTRA_CXX="-D_LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION=3 -D_LIBCPP_DARWIN_CTYPE_ABI -fc++-abi=arm"
-# Apply our source changes (Darwin ctype masks, regex, Mach-O unwind hook) once.
-if patch -d "$LLVM_SRC" -p1 -R --dry-run -s -f < "$HERE/llvm-19.1.7-ftl.patch" >/dev/null 2>&1; then
-  echo "LLVM sources already patched"
-else
-  patch -d "$LLVM_SRC" -p1 -N < "$HERE/llvm-19.1.7-ftl.patch"
-fi
+# Apply our source changes (Darwin ctype masks, regex, Mach-O unwind hook) once;
+# for the Switch also libunwind's bare-metal lookup (its own patch, since the
+# other targets don't use that path). A patch that no longer applies forward is
+# taken as applied.
+apply_once() {
+  if patch -d "$LLVM_SRC" -p1 -N --dry-run -s -f < "$1" >/dev/null 2>&1; then
+    patch -d "$LLVM_SRC" -p1 -N -s < "$1"
+  else
+    echo "LLVM sources already have $(basename "$1")"
+  fi
+}
+apply_once "$HERE/llvm-19.1.7-ftl.patch"
+if [ "$TARGET" = switch ]; then apply_once "$HERE/llvm-19.1.7-ftl-switch.patch"; fi
 COMMON=(
   -G Ninja -S "$LLVM_SRC/runtimes" -B "$BUILD"
   -DCMAKE_BUILD_TYPE=Release
@@ -42,7 +51,21 @@ COMMON=(
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
   -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON
 )
-if [ "$TARGET" = linux ]; then
+if [ "$TARGET" = switch ]; then
+  # newlib (devkitA64's) + libnx threads. Thread-locals are emulated (see the
+  # toolchain); no filesystem library (newlib's dirent is enough for the game).
+  # _GNU_SOURCE: newlib hides FILE, locale_t and others from wchar.h and friends
+  # in strict mode, which libc++'s using-declarations then trip over.
+  cmake "${COMMON[@]}" \
+    -DCMAKE_TOOLCHAIN_FILE="$HERE/../switch/toolchain.cmake" \
+    -DCMAKE_C_FLAGS="-fno-omit-frame-pointer -D_GNU_SOURCE" \
+    -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -D_GNU_SOURCE -D_LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE $EXTRA_CXX" \
+    -DLIBCXX_USE_COMPILER_RT=OFF -DLIBCXXABI_USE_COMPILER_RT=OFF -DLIBUNWIND_USE_COMPILER_RT=OFF \
+    -DLIBCXX_ENABLE_FILESYSTEM=OFF -DLIBCXX_ENABLE_MONOTONIC_CLOCK=ON \
+    -DLIBCXX_HAS_PTHREAD_API=ON -DLIBCXXABI_HAS_PTHREAD_API=ON -DLIBUNWIND_ENABLE_THREADS=ON \
+    -DLIBCXXABI_BAREMETAL=OFF -DLIBUNWIND_IS_BAREMETAL=ON \
+    -DPython3_EXECUTABLE=/usr/bin/python3
+elif [ "$TARGET" = linux ]; then
   # On an aarch64 host build natively; otherwise cross-compile against a sysroot.
   SYSROOT_ARGS=()
   if [ "$(uname -m)" != aarch64 ] || [ -n "${SYSROOT:-}" ]; then
@@ -61,7 +84,7 @@ if [ "$TARGET" = linux ]; then
     -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
     -DPython3_EXECUTABLE=/usr/bin/python3 -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
 else
-  echo "unknown target $TARGET (linux)" >&2
+  echo "unknown target $TARGET (linux, switch)" >&2
   exit 1
 fi
 ninja -C "$BUILD" cxx cxxabi unwind

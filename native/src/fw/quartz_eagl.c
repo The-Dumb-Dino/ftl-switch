@@ -2,7 +2,9 @@
 // (EAGLContext) on top of EGL/GLES3. The game's "drawable" renderbuffer is a
 // real offscreen renderbuffer; presentRenderbuffer: composites it onto the
 // window surface (scaling/letterboxing as configured) and swaps.
+#ifndef __SWITCH__
 #include <dlfcn.h>
+#endif
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -442,7 +444,9 @@ static void GL_APIENTRY wrap_glLinkProgram(GLuint p) {
     }
 }
 
+#ifndef __SWITCH__
 static void *g_gles_lib;
+#endif
 void *eagl_get_proc(const char *name) {
     if (!name) return NULL;
     if (!strcmp(name, "glDiscardFramebufferEXT")) return (void *)wrap_glDiscardFramebufferEXT;
@@ -461,12 +465,14 @@ void *eagl_get_proc(const char *name) {
         (!strncmp(name, "glCreate", 8) && strcmp(name, "glCreateProgram") && strcmp(name, "glCreateShader")))
         return NULL;
     void *p = NULL;
+#ifndef __SWITCH__  // linked statically there: everything comes from eglGetProcAddress
     if (!g_gles_lib) {
         g_gles_lib = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
         if (!g_gles_lib) g_gles_lib = dlopen("libGLESv2.so", RTLD_NOW | RTLD_LOCAL);
         if (!g_gles_lib) g_gles_lib = dlopen("libGLESv2.so.2", RTLD_NOW | RTLD_LOCAL);
     }
     if (g_gles_lib) p = dlsym(g_gles_lib, name);
+#endif
     if (!p) p = plat_gl_get_proc(name);
     return p;
 }

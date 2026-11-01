@@ -191,6 +191,12 @@ int main(int argc, char **argv) {
     // After a crash, or once ftlman changed ftl.dat, start at the title screen:
     // the saved run may be what crashed, or may not load with the new mods.
     mods_prepare();
+    if (mods_dat_is_pc()) {
+        sdl_show_error("FTL", "The game folder's ftl.dat is from the PC version of FTL, which doesn't run here.\n\n"
+                              "Apply mods with ftl-linux --ftlman (it patches the iPad game's ftl.dat), or\n"
+                              "import the .ipa again with ftl-linux --import.");
+        return 1;
+    }
     bool mods_changed = mods_take_changed();
     ux_set_option("resume_run", !crashed && !mods_changed && setting_bool("resume_run", false));
 

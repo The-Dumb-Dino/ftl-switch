@@ -174,8 +174,8 @@ int mods_install(mo_image *img, const char *index_path) {
     g_img = img;
     if (load_index(index_path) != 0) return -1;
     // Expected code, so a different build isn't patched blindly.
-    const uint32_t *fi = mo_ptr(img, G_PKG_FILE_INFO), *ls = mo_ptr(img, G_PKG_LIST_START),
-                   *ln = mo_ptr(img, G_PKG_LIST_NEXT);
+    const uint32_t *fi = mo_rptr(img, G_PKG_FILE_INFO), *ls = mo_rptr(img, G_PKG_LIST_START),
+                   *ln = mo_rptr(img, G_PKG_LIST_NEXT);
     if (fi[0] != 0xD10243FFu || ls[0] != 0xB4000080u || ln[0] != 0xB4000200u) {
         LOGW("mods: unexpected code in the ftl.dat reader; mod images may not show");
         return -1;

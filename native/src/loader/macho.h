@@ -55,6 +55,9 @@ mo_section *mo_find_section(mo_image *img, const char *seg, const char *sect);
 static inline void *mo_ptr(mo_image *img, uint64_t linkaddr) { return (void *)(uintptr_t)(linkaddr + img->slide); }
 // Writable view of the image at a link-time address (the same as mo_ptr on Linux).
 static inline void *mo_wptr(mo_image *img, uint64_t linkaddr) { return execmem_to_rw(&img->mem, mo_ptr(img, linkaddr)); }
+// Reading the image before mo_protect: through the writable view too, since on a
+// host with separate views (the Switch) the executable one exists only from then on.
+static inline const void *mo_rptr(mo_image *img, uint64_t linkaddr) { return mo_wptr(img, linkaddr); }
 // n bytes (16-byte aligned) of near-trampoline space, before mo_protect; NULL when full.
 // Returns the executable address; write through execmem_to_rw(&img->mem, p).
 void *mo_tramp_alloc(mo_image *img, size_t n);

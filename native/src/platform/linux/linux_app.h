@@ -21,6 +21,7 @@ extern app_paths g_paths;
 void paths_init(void);
 int mkdirs(const char *path);  // mkdir -p
 int copy_file(const char *from, const char *to, int mode);  // 0 on success
+int replace_file(const char *from, const char *to);  // rename over an existing file (also on the Switch)
 
 // ---- settings.ini ----
 void settings_load(const char *path);
@@ -65,6 +66,7 @@ void mods_prepare(void);              // looks at ftl.dat; makes the image overl
 const char *mods_active_index(void);  // the overlay to start the game with, or NULL
 bool mods_take_changed(void);         // ftl.dat changed since the last start
 bool mods_hyperspace_applied(void);
+bool mods_dat_is_pc(void);            // ftl.dat is the PC version's, not the iPad game's
 bool find_ftlman(char *out, size_t n);
 bool find_hyperspace(char *out, size_t n);  // Hyperspace for the iPad game, if installed
 int ftlman_configure(const char *ftlman_dir, const char *game_dir);  // its settings.json points at the game

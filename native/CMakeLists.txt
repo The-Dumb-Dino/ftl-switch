@@ -4,6 +4,7 @@ project(ftlport C ASM)
 set(CMAKE_C_STANDARD 11)
 set(LIBCXX_DIR "" CACHE PATH "Apple-ABI libc++ install dir (lib/ with libc++.a, libc++abi.a, libunwind.a)")
 option(FTL_HARNESS "Build the test harness (ftlrun) instead of the desktop app (ftl-linux)" OFF)
+option(FTL_SWITCH_APP "Build the Nintendo Switch homebrew app (ftl.nro; switch/toolchain.cmake)" OFF)
 set(FTL_LINUX_VERSION "dev" CACHE STRING "Version string of ftl-linux")
 
 set(CORE_SOURCES
@@ -42,7 +43,98 @@ set(CXX_LIBS
     ${LIBCXX_DIR}/lib/libc++abi.a
     ${LIBCXX_DIR}/lib/libunwind.a)
 
-if(NOT FTL_HARNESS)
+if(FTL_SWITCH_APP)
+    # Switch homebrew (switch/toolchain.cmake, README in switch/). The POSIX execmem and
+    # Hyperspace's dlopen don't apply: code is mapped with svcMapProcessCodeMemory.
+    set(FTL_SWITCH_VERSION "dev" CACHE STRING "Version string of ftl.nro")
+    # Hyperspace, linked in (hyperspace/build-switch.sh): its library and the folder with
+    # the Lua it was built with. Without it, ftl.nro has stubs and plays without Hyperspace.
+    set(FTL_SWITCH_HYPERSPACE "" CACHE FILEPATH "libHyperspace.a built for the Switch (optional)")
+    set(FTL_SWITCH_HS_DEPS "" CACHE PATH "Its dependencies (lib/liblua.a)")
+    # ftlman's patch engine, linked in (switch/rust/build-ftlman.sh): mods from /switch/ftl/mods/
+    set(FTL_SWITCH_FTLMAN "" CACHE FILEPATH "libftlman_switch.a built for the Switch (optional)")
+    list(REMOVE_ITEM CORE_SOURCES src/loader/execmem.c)
+    if(NOT FTL_SWITCH_HYPERSPACE)
+        list(REMOVE_ITEM CORE_SOURCES src/hyperspace.c)
+    endif()
+    add_executable(ftl ${CORE_SOURCES}
+        src/platform/switch/main_switch.c
+        src/platform/switch/plat_switch.c
+        src/platform/switch/execmem_switch.c
+        src/platform/switch/log_switch.c
+        src/platform/switch/compat_switch.c
+        src/platform/switch/memdiag_switch.c
+        # shared with the Linux app: settings.ini, the .ipa import, the mod image overlay
+        src/platform/linux/settings.c
+        src/platform/linux/import.c
+        src/platform/linux/zip.c
+        src/platform/linux/mods_linux.c)
+    set_target_properties(ftl PROPERTIES SUFFIX ".elf")
+    # _GNU_SOURCE (empty, as the files that also define it do): newlib shows vasprintf
+    # and the like only then, and it must come before the stdint.h included below
+    target_compile_definitions(ftl PRIVATE FTL_SWITCH_APP _GNU_SOURCE= FTL_SWITCH_VERSION="${FTL_SWITCH_VERSION}")
+    # every allocation through memdiag_switch.c, which logs the ones that fail
+    target_link_options(ftl PRIVATE -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=memalign)
+    if(FTL_SWITCH_FTLMAN)
+        # One object with only ftlman_patch global: its Lua 5.4 (and Rust's runtime)
+        # stay private next to Hyperspace's Lua 5.3, as mesa's libstdc++ does above.
+        add_custom_command(OUTPUT ftlman-private.o
+            COMMAND ld.lld -r -o ftlman-linked.o --whole-archive ${FTL_SWITCH_FTLMAN}
+            COMMAND llvm-objcopy --keep-global-symbol=ftlman_patch ftlman-linked.o ftlman-private.o
+            DEPENDS ${FTL_SWITCH_FTLMAN} VERBATIM)
+        add_custom_target(ftlman_private DEPENDS ftlman-private.o)
+        add_dependencies(ftl ftlman_private)
+        target_sources(ftl PRIVATE src/platform/switch/mods_switch.c)
+        target_compile_definitions(ftl PRIVATE FTL_SWITCH_FTLMAN)
+        target_link_libraries(ftl PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/ftlman-private.o)
+    endif()
+    if(FTL_SWITCH_HYPERSPACE)
+        target_compile_definitions(ftl PRIVATE FTL_SWITCH_HYPERSPACE)
+        # before libc++: Hyperspace uses the same one as the game. Whole: most of its
+        # files only register hooks from static constructors, which nothing references,
+        # so a plain archive link left a third of them out (the more-info button, lazy
+        # image loading, custom tooltips and more).
+        target_link_libraries(ftl PRIVATE -Wl,--whole-archive ${FTL_SWITCH_HYPERSPACE} -Wl,--no-whole-archive
+            ${FTL_SWITCH_HS_DEPS}/lib/liblua.a
+            ${DEVKITPRO}/portlibs/switch/lib/libminizip.a)
+    endif()
+    target_include_directories(ftl PRIVATE include src)
+    # newlib's stdatomic.h (which clang's defers to) uses stdint.h's types without including it
+    target_compile_options(ftl PRIVATE ${COMMON_FLAGS} -O2 -g -Wno-cast-function-type-mismatch
+        -Wno-gnu-variable-sized-type-not-at-end -Wno-unknown-warning-option
+        $<$<COMPILE_LANGUAGE:C>:-include stdint.h>)
+    # mesa for the Switch (devkitPro's switch-mesa: EGL, GLESv2, glapi, drm_nouveau). Its GPU
+    # compiler is C++ built against libstdc++, whose std::exception & co. clash with the
+    # game's libc++. So mesa and the libstdc++ it needs are linked into one object first,
+    # in which everything but mesa's API (egl*, gl*) is made local: mesa keeps a private
+    # C++ runtime and the game's libc++ stays as it is.
+    set(_pl ${DEVKITPRO}/portlibs/switch/lib)
+    set(_nl ${DEVKITPRO}/devkitA64/aarch64-none-elf/lib)
+    add_custom_command(OUTPUT mesa-private.o
+        COMMAND ld.lld -r -o mesa-linked.o --whole-archive ${_pl}/libEGL.a ${_pl}/libGLESv2.a ${_pl}/libglapi.a
+                ${_pl}/libdrm_nouveau.a --no-whole-archive ${_nl}/libstdc++.a
+        COMMAND llvm-objcopy --wildcard --keep-global-symbol=egl* --keep-global-symbol=gl*
+                mesa-linked.o mesa-private.o
+        DEPENDS ${_pl}/libEGL.a ${_pl}/libGLESv2.a ${_pl}/libglapi.a ${_pl}/libdrm_nouveau.a VERBATIM)
+    add_custom_target(mesa_private DEPENDS mesa-private.o)
+    add_dependencies(ftl mesa_private)
+    target_link_libraries(ftl PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/mesa-private.o ${CXX_LIBS} z)
+    find_program(ELF2NRO elf2nro HINTS $ENV{HOME}/ftl-build/switch/tools ${DEVKITPRO}/tools/bin REQUIRED)
+    find_program(NACPTOOL nacptool HINTS $ENV{HOME}/ftl-build/switch/tools ${DEVKITPRO}/tools/bin REQUIRED)
+    set(FTL_SWITCH_ICON "" CACHE FILEPATH "256x256 JPEG for the Homebrew Menu (optional; not in the repository)")
+    if(FTL_SWITCH_ICON)
+        set(_icon --icon=${FTL_SWITCH_ICON})
+        set(_icon_dep ${FTL_SWITCH_ICON})
+    endif()
+    # a relocation into read-only memory crashes ftl.nro on a console before main
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_custom_command(OUTPUT ftl.nro
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../switch/check-relocs.py $<TARGET_FILE:ftl>
+        COMMAND ${NACPTOOL} --create "FTL: Faster Than Light" "FTL port (your own iPad copy)" "${FTL_SWITCH_VERSION}" ftl.nacp
+        COMMAND ${ELF2NRO} $<TARGET_FILE:ftl> ftl.nro --nacp=ftl.nacp ${_icon}
+        DEPENDS ftl ${_icon_dep} VERBATIM)
+    add_custom_target(nro ALL DEPENDS ftl.nro)
+elseif(NOT FTL_HARNESS)
     find_package(SDL3 REQUIRED CONFIG)
     find_package(ZLIB REQUIRED)
     add_executable(ftl-linux ${CORE_SOURCES}

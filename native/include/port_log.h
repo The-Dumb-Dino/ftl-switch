@@ -1,8 +1,9 @@
 #pragma once
 #include <stdio.h>
 
-#ifdef FTL_LINUX_APP
-// stderr, plus the session log file once port_log_open has run (platform/linux/log_linux.c)
+#if defined(FTL_LINUX_APP) || defined(FTL_SWITCH_APP)
+// stderr (Switch: stdout, for nxlink), plus the session log file once port_log_open has
+// run (platform/linux/log_linux.c, platform/switch/log_switch.c)
 enum { PORT_LOG_INFO = 4, PORT_LOG_WARN = 5, PORT_LOG_ERROR = 6 };
 void port_log(int prio, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void port_log_open(const char *dir);

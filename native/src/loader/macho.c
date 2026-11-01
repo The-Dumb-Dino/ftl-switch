@@ -6,7 +6,6 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -200,7 +199,12 @@ int mo_load(const char *path, mo_image *img) {
     // Extra room after the image, on its own pages, for "near" trampolines
     // reachable by a 4-byte b, and for stubs of unresolved imports.
     size_t tramp_off = (span + ps - 1) & ~(ps - 1);
+#ifdef __SWITCH__
+    // Hyperspace's hooks (1 MB) come from here too: the Switch can't map more code next to the game later.
+    size_t tramp_size = (0x140000 + ps - 1) & ~(ps - 1);
+#else
     size_t tramp_size = (0x40000 + ps - 1) & ~(ps - 1);
+#endif
     if (execmem_alloc(&img->mem, tramp_off + tramp_size, align) != 0) return -1;
     uint8_t *base = img->mem.rx, *wbase = img->mem.rw;
     img->near_tramp = base + tramp_off;

@@ -32,7 +32,11 @@ static bool prefix_ci(const char *s, const char *p) { return !strncasecmp(s, p, 
 
 int copy_file(const char *from, const char *to, int mode) {
     FILE *in = fopen(from, "rbe");
+#ifdef __SWITCH__
+    int fd = in ? open(to, O_WRONLY | O_CREAT | O_TRUNC, mode) : -1;  // no exec, and libnx refuses O_CLOEXEC
+#else
     int fd = in ? open(to, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, mode) : -1;
+#endif
     FILE *out = fd >= 0 ? fdopen(fd, "wb") : NULL;
     if (!in || !out) {
         if (in) fclose(in);
@@ -52,6 +56,15 @@ int copy_file(const char *from, const char *to, int mode) {
     return rc;
 }
 
+// rename(from, to) over an existing to. POSIX does that in one step; on the Switch the
+// file system refuses an existing target, so it's removed first.
+int replace_file(const char *from, const char *to) {
+#ifdef __SWITCH__
+    unlink(to);
+#endif
+    return rename(from, to);
+}
+
 static int write_file(const char *path, const char *text) {
     char tmp[1200];
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
@@ -59,7 +72,7 @@ static int write_file(const char *path, const char *text) {
     if (!f) return -1;
     int bad = fputs(text, f) < 0;
     if (fclose(f)) bad = 1;
-    if (bad || rename(tmp, path)) {
+    if (bad || replace_file(tmp, path)) {
         unlink(tmp);
         return -1;
     }
@@ -233,7 +246,7 @@ static int write_overlay(pkg *k, const char *dir, int *nimages) {
         const char *name = i ? "overlay.idx" : "overlay.dat";  // the index last: it marks a complete overlay
         snprintf(from, sizeof from, "%s/%s.tmp", dir, name);
         path_in(to, sizeof to, dir, name);
-        if (rename(from, to)) rc = -1;
+        if (replace_file(from, to)) rc = -1;
     }
     return rc;
 }
@@ -250,7 +263,7 @@ static void dat_stamp(const char *dat, char *out, size_t n) {
 }
 
 static char g_index[800];
-static bool g_modded, g_hyperspace, g_changed;
+static bool g_modded, g_hyperspace, g_changed, g_pc_dat;
 
 void mods_prepare(void) {
     char dat[700], dir[700], p[900], stamp[128];
@@ -298,6 +311,14 @@ void mods_prepare(void) {
         LOGW("mods: %s isn't readable as ftl.dat", dat);
         return;
     }
+    // The iPad game's ftl.dat has texture atlases; the PC version's (Steam, GOG, or one
+    // patched there from it) has none and can't run here
+    if (!pkg_find(&k, "atlas/achievements.tex") && !pkg_find(&k, "atlas/people/engi.txt")) {
+        pkg_close(&k);
+        g_pc_dat = true;
+        LOGE("mods: %s is the PC version's ftl.dat (no iPad atlases)", dat);
+        return;
+    }
     int nimg = 0;
     g_hyperspace = pkg_find(&k, "data/hyperspace.xml") != NULL;
     int rc = write_overlay(&k, dir, &nimg);
@@ -317,7 +338,9 @@ void mods_prepare(void) {
 const char *mods_active_index(void) { return g_index[0] ? g_index : NULL; }
 bool mods_hyperspace_applied(void) { return g_hyperspace; }
 bool mods_take_changed(void) { return g_changed; }
+bool mods_dat_is_pc(void) { return g_pc_dat; }
 
+#ifndef __SWITCH__  // ftlman and Hyperspace run on a PC; the Switch only reads the result
 // ---------------------------------------------------------------------------
 // ftlman: settings.ini "ftlman", else next to ftl-linux (or its libexec), else PATH
 bool find_ftlman(char *out, size_t n) {
@@ -495,3 +518,4 @@ int ftlman_run(void) {
     fprintf(stderr, "Couldn't run %s: %s\n", run, strerror(errno));
     return 1;
 }
+#endif

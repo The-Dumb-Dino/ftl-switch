@@ -52,7 +52,7 @@ static void *png_parse(const void *data, uint32_t size, int mem_flags, int *w_re
 }
 
 int png_install(mo_image *img) {
-    const uint32_t *code = mo_ptr(img, G_PNG_PARSE);
+    const uint32_t *code = mo_rptr(img, G_PNG_PARSE);
     if (code[0] != 0xD2800000u || code[1] != 0xD65F03C0u) {  // mov x0, #0; ret
         LOGW("png: unexpected code at png_parse; PNG images from mods won't load");
         return -1;

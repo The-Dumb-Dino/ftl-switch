@@ -54,6 +54,20 @@ int execmem_protect(execmem *m, size_t off, size_t len, int prot) {
     return 0;
 }
 
+void *execmem_to_rw(const execmem *m, const void *rx) { return m->rw + ((const uint8_t *)rx - m->rx); }
+
+// The page stays executable while it's written: another thread may be running it.
+int execmem_write_code(execmem *m, void *rx, const void *src, size_t n) {
+    size_t ps = execmem_page_size();
+    uintptr_t a = (uintptr_t)rx & ~(uintptr_t)(ps - 1), b = ((uintptr_t)rx + n + ps - 1) & ~(uintptr_t)(ps - 1);
+    if (mprotect((void *)a, b - a, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) return -1;
+    memcpy(rx, src, n);
+    __builtin___clear_cache((char *)rx, (char *)rx + n);
+    mprotect((void *)a, b - a, PROT_READ | PROT_EXEC);
+    (void)m;
+    return 0;
+}
+
 void execmem_free(execmem *m) {
     if (m->rx) munmap(m->rx, m->size);
     m->rw = m->rx = NULL;
