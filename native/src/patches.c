@@ -1,26 +1,13 @@
-// Code patching infrastructure for the loaded game image.
+// Code patching infrastructure for the loaded game image. Runs before mo_protect,
+// which makes the patched code and the trampolines executable (and flushes the
+// instruction cache).
 #include "patches.h"
 
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
 #include "loader/macho.h"
 #include "port_log.h"
-
-static uint8_t *g_tramp_page;
-static size_t g_tramp_used;
-
-static void *tramp_alloc(size_t n) {
-    if (!g_tramp_page) {
-        g_tramp_page = mmap(NULL, 0x10000, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (g_tramp_page == MAP_FAILED) { g_tramp_page = NULL; return NULL; }
-    }
-    if (g_tramp_used + n > 0x10000) return NULL;
-    void *p = g_tramp_page + g_tramp_used;
-    g_tramp_used += (n + 15) & ~(size_t)15;
-    return p;
-}
 
 static int is_pc_relative(uint32_t ins) {
     if ((ins & 0x9f000000) == 0x90000000) return 1;  // adrp
@@ -43,7 +30,7 @@ static void write_abs_jump(uint32_t *p, void *target) {
 }
 
 void *patch_hook(mo_image *img, uint64_t addr, void *hook, int want_original) {
-    uint32_t *code = mo_ptr(img, addr);
+    uint32_t *code = mo_ptr(img, addr), *wcode = mo_wptr(img, addr);
     void *orig = NULL;
     if (want_original) {
         for (int i = 0; i < 4; i++)
@@ -51,30 +38,27 @@ void *patch_hook(mo_image *img, uint64_t addr, void *hook, int want_original) {
                 LOGE("patch_hook %#lx: instruction %d is pc-relative (%08x)", (unsigned long)addr, i, code[i]);
                 return NULL;
             }
-        uint32_t *t = tramp_alloc(32);
+        uint32_t *t = mo_tramp_alloc(img, 32);
         if (!t) return NULL;
-        memcpy(t, code, 16);
-        write_abs_jump(t + 4, code + 4);
-        __builtin___clear_cache((char *)t, (char *)(t + 8));
+        uint32_t *wt = execmem_to_rw(&img->mem, t);
+        memcpy(wt, code, 16);
+        write_abs_jump(wt + 4, code + 4);
         orig = t;
     }
-    write_abs_jump(code, hook);
-    __builtin___clear_cache((char *)code, (char *)(code + 4));
+    write_abs_jump(wcode, hook);
     return want_original ? orig : (void *)1;
 }
 
 // Replace the instruction at `addr` with a branch to `target` through a near
 // trampoline (works for tiny functions, e.g. a lone `ret`). Must run before mo_protect.
 int patch_branch(mo_image *img, uint64_t addr, void *target) {
-    if (!img->near_tramp || img->near_tramp_used + 16 > img->near_tramp_size) return -1;
-    uint32_t *t = (uint32_t *)(img->near_tramp + img->near_tramp_used);
-    img->near_tramp_used += 16;
-    write_abs_jump(t, target);
+    uint32_t *t = mo_tramp_alloc(img, 16);
+    if (!t) return -1;
+    write_abs_jump(execmem_to_rw(&img->mem, t), target);
     uint32_t *code = mo_ptr(img, addr);
     intptr_t delta = (intptr_t)((uint8_t *)t - (uint8_t *)code);
     if (delta >= (1 << 27) || delta < -(1 << 27)) return -1;
-    *code = 0x14000000u | ((uint32_t)(delta >> 2) & 0x03ffffffu);
-    __builtin___clear_cache((char *)code, (char *)(code + 1));
+    *(uint32_t *)mo_wptr(img, addr) = 0x14000000u | ((uint32_t)(delta >> 2) & 0x03ffffffu);
     return 0;
 }
 

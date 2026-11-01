@@ -7,6 +7,7 @@ option(FTL_HARNESS "Build the Linux test harness executable instead of the Andro
 
 set(CORE_SOURCES
     src/loader/macho.c
+    src/loader/execmem.c
     src/loader/symbols.c
     src/loader/symbols_cxx.c
     src/objc/objc_runtime.c
@@ -45,7 +46,7 @@ if(FTL_HARNESS)
     target_compile_definitions(ftlrun PRIVATE FTL_GUARD_ALLOC)
     target_include_directories(ftlrun PRIVATE include src)
     target_compile_options(ftlrun PRIVATE ${COMMON_FLAGS} -g)
-    target_link_options(ftlrun PRIVATE -fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,--gc-sections
+    target_link_options(ftlrun PRIVATE -fuse-ld=lld -Wl,--exclude-libs,ALL -Wl,--gc-sections -Wl,-z,max-page-size=65536
         -Wl,--export-dynamic-symbol=free -Wl,--export-dynamic-symbol=realloc
         -Wl,--export-dynamic-symbol=malloc -Wl,--export-dynamic-symbol=calloc)
     target_link_libraries(ftlrun PRIVATE ${CXX_LIBS} EGL GLESv2 z pthread dl m)

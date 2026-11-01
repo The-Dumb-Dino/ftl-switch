@@ -3,7 +3,8 @@
 # for loading iOS binaries: alternate std::string layout, non-unique RTTI bit,
 # Darwin ctype masks, and libunwind able to walk Mach-O compact-unwind frames.
 #   ./build.sh android   -> out/android/lib/*.a
-#   ./build.sh linux     -> out/linux/lib/*.a   (aarch64 glibc, qemu test harness)
+#   ./build.sh linux     -> out/linux/lib/*.a   (aarch64 glibc: native build on an
+#                           aarch64 host, else cross with SYSROOT=~/arm64-root)
 set -euo pipefail
 TARGET=${1:-android}
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -49,13 +50,17 @@ if [ "$TARGET" = android ]; then
     -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DANDROID_STL=none \
     -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer $EXTRA_CXX" -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
 else
-  SYSROOT=$HOME/arm64-root
+  # On an aarch64 host build natively; otherwise cross-compile against a sysroot.
+  SYSROOT_ARGS=()
+  if [ "$(uname -m)" != aarch64 ] || [ -n "${SYSROOT:-}" ]; then
+    SYSROOT_ARGS=(-DCMAKE_SYSROOT="${SYSROOT:-$HOME/arm64-root}")
+  fi
   cmake "${COMMON[@]}" \
     -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_COMPILER_TARGET=aarch64-linux-gnu -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-gnu \
     -DCMAKE_ASM_COMPILER_TARGET=aarch64-linux-gnu \
-    -DCMAKE_SYSROOT="$SYSROOT" \
+    "${SYSROOT_ARGS[@]}" \
     -DCMAKE_C_FLAGS="-fno-omit-frame-pointer" \
     -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer -D_LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE $EXTRA_CXX" \
     -DLIBCXX_USE_COMPILER_RT=OFF -DLIBCXXABI_USE_COMPILER_RT=OFF -DLIBUNWIND_USE_COMPILER_RT=OFF \

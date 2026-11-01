@@ -15,7 +15,8 @@
 #include "port_log.h"
 
 #define REGION_SIZE (32ull << 30)
-#define PAGE 4096ul
+static size_t g_page;  // host page size, set by guard_init
+#define PAGE g_page
 
 static uint8_t *g_region, *g_next;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -24,6 +25,7 @@ static gent *g_tab;
 static size_t g_tabmask;
 
 static void guard_init(void) {
+    g_page = (size_t)sysconf(_SC_PAGESIZE);
     g_region = mmap(NULL, REGION_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
     if (g_region == MAP_FAILED) { LOGE("guard: reserve failed"); abort(); }
     g_next = g_region;

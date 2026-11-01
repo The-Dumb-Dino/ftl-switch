@@ -191,18 +191,19 @@ int mo_load(const char *path, mo_image *img) {
     }
     if (lo == UINT64_MAX) { LOGE("macho: no segments"); return -1; }
 
-    // Reserve one region for all segments, 16K aligned (iOS page size).
-    const size_t align = 0x4000;
+    // Reserve one region for all segments, aligned to 16K (iOS pages) or the host
+    // page if that is larger. Segments are copied in, never mapped from the file,
+    // so any host page size works (Mach-O segments are only 16K aligned).
+    size_t ps = execmem_page_size();
+    const size_t align = ps > 0x4000 ? ps : 0x4000;
     size_t span = (size_t)(hi - lo);
-    // Extra room after the image for "near" trampolines reachable by a 4-byte b.
-    const size_t tramp_size = 0x40000;
-    size_t reserve = span + tramp_size + align;
-    uint8_t *raw = mmap(NULL, reserve, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (raw == MAP_FAILED) { LOGE("macho: mmap %zu failed", reserve); return -1; }
-    uint8_t *base = (uint8_t *)(((uintptr_t)raw + align - 1) & ~(uintptr_t)(align - 1));
-    if (base > raw) munmap(raw, (size_t)(base - raw));
-    munmap(base + span + tramp_size, (size_t)(raw + reserve - (base + span + tramp_size)));
-    img->near_tramp = base + span;
+    // Extra room after the image, on its own pages, for "near" trampolines
+    // reachable by a 4-byte b, and for stubs of unresolved imports.
+    size_t tramp_off = (span + ps - 1) & ~(ps - 1);
+    size_t tramp_size = (0x40000 + ps - 1) & ~(ps - 1);
+    if (execmem_alloc(&img->mem, tramp_off + tramp_size, align) != 0) return -1;
+    uint8_t *base = img->mem.rx, *wbase = img->mem.rw;
+    img->near_tramp = base + tramp_off;
     img->near_tramp_size = tramp_size;
 
     img->base = base;
@@ -214,7 +215,7 @@ int mo_load(const char *path, mo_image *img) {
         mo_segment *s = &img->segs[i];
         if (!strcmp(s->name, "__PAGEZERO")) continue;
         if (s->fileoff + s->filesize > img->file_size) { LOGE("macho: segment %s out of file", s->name); return -1; }
-        memcpy(base + (s->vmaddr - lo), f + s->fileoff, (size_t)s->filesize);
+        memcpy(wbase + (s->vmaddr - lo), f + s->fileoff, (size_t)s->filesize);
     }
     for (int i = 0; i < img->nsects; i++) img->sects[i].addr += (uint64_t)img->slide;
     if (have_main) {
@@ -230,7 +231,7 @@ int mo_load(const char *path, mo_image *img) {
     int count = 0;
 #define REBASE_AT()                                                         \
     do {                                                                    \
-        uint64_t *loc = (uint64_t *)(base + (seg_addr + off - lo));         \
+        uint64_t *loc = (uint64_t *)(wbase + (seg_addr + off - lo));         \
         *loc += (uint64_t)img->slide;                                       \
         count++;                                                            \
     } while (0)
@@ -278,18 +279,18 @@ __asm__(
     "  mov x0, x16\n"
     "  b mo_trap_c\n");
 
-static uint8_t *g_stub_page;
-static size_t g_stub_used, g_stub_cap;
+void *mo_tramp_alloc(mo_image *img, size_t n) {
+    n = (n + 15) & ~(size_t)15;
+    if (!img->near_tramp || img->near_tramp_used + n > img->near_tramp_size) return NULL;
+    void *p = img->near_tramp + img->near_tramp_used;
+    img->near_tramp_used += n;
+    return p;
+}
 
-static void *make_trap_stub(const char *name) {
-    if (!g_stub_page || g_stub_used + 32 > g_stub_cap) {
-        g_stub_cap = 0x10000;
-        g_stub_page = mmap(NULL, g_stub_cap, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (g_stub_page == MAP_FAILED) port_fatal("stub mmap failed");
-        g_stub_used = 0;
-    }
-    uint32_t *s = (uint32_t *)(g_stub_page + g_stub_used);
-    g_stub_used += 32;
+static void *make_trap_stub(mo_image *img, const char *name) {
+    uint32_t *x = mo_tramp_alloc(img, 32);
+    if (!x) port_fatal("no room for import stubs");
+    uint32_t *s = execmem_to_rw(&img->mem, x);
     s[0] = 0x58000090;  // ldr x16, #16
     s[1] = 0x580000B1;  // ldr x17, #20
     s[2] = 0xD61F0220;  // br x17
@@ -298,8 +299,7 @@ static void *make_trap_stub(const char *name) {
     memcpy(&s[4], &dup, 8);
     void *h = (void *)mo_trap_entry;
     memcpy(&s[6], &h, 8);
-    __builtin___clear_cache((char *)s, (char *)(s + 8));
-    return s;
+    return x;  // made executable by mo_protect
 }
 
 static uint64_t g_zero_data[512];
@@ -325,11 +325,11 @@ static int do_binds(mo_image *img, const uint8_t *p, const uint8_t *end, int laz
                 LOGW("macho: unresolved %s%s (%s)", sym, weak_import ? " [weak]" : "", lib ? lib : "?"); \
                 int looks_data = !strncmp(sym, "_OBJC_", 6) || !strncmp(sym, "_k", 2) ||        \
                                  strstr(sym, "Notification") || strstr(sym, "Key");             \
-                target = looks_data ? (void *)g_zero_data : make_trap_stub(sym);             \
+                target = looks_data ? (void *)g_zero_data : make_trap_stub(img, sym);             \
             }                                                                             \
             resolved = 1;                                                                 \
         }                                                                                 \
-        uint64_t *loc = (uint64_t *)(img->base + (seg_addr + off - img->vmaddr_min));     \
+        uint64_t *loc = (uint64_t *)(img->mem.rw + (seg_addr + off - img->vmaddr_min));     \
         *loc = (uint64_t)(uintptr_t)target + (uint64_t)addend;                           \
         (*nbound)++;                                                                      \
     } while (0)
@@ -381,21 +381,33 @@ int mo_bind(mo_image *img, mo_resolver resolve) {
 }
 
 void mo_protect(mo_image *img) {
+    // Protection is per host page. With pages larger than 16K (64K kernels) a page
+    // can hold the end of one segment and the start of the next, e.g. __TEXT and
+    // __DATA; it then gets both segments' permissions.
+    size_t ps = execmem_page_size(), npages = img->mem.size / ps;
+    uint8_t *prot = calloc(npages, 1);
+    int mixed = 0;
     for (int i = 0; i < img->nsegs; i++) {
         mo_segment *s = &img->segs[i];
-        if (!strcmp(s->name, "__PAGEZERO")) continue;
-        int prot = 0;
-        if (s->initprot & 1) prot |= PROT_READ;
-        if (s->initprot & 2) prot |= PROT_WRITE;
-        if (s->initprot & 4) prot |= PROT_EXEC;
-        uint8_t *a = img->base + (s->vmaddr - img->vmaddr_min);
-        if (prot & PROT_EXEC) __builtin___clear_cache((char *)a, (char *)a + s->vmsize);
-        if (mprotect(a, (size_t)s->vmsize, prot) != 0) LOGW("macho: mprotect %s failed: %s", s->name, strerror(errno));
+        if (!strcmp(s->name, "__PAGEZERO") || !s->vmsize) continue;
+        size_t a = (size_t)(s->vmaddr - img->vmaddr_min), b = a + (size_t)s->vmsize;
+        for (size_t pg = a / ps; pg <= (b - 1) / ps && pg < npages; pg++) {
+            if (prot[pg] && prot[pg] != (s->initprot & 7)) mixed = 1;
+            prot[pg] |= (uint8_t)(s->initprot & 7);
+        }
     }
     if (img->near_tramp) {
-        __builtin___clear_cache((char *)img->near_tramp, (char *)img->near_tramp + img->near_tramp_size);
-        mprotect(img->near_tramp, img->near_tramp_size, PROT_READ | PROT_EXEC);
+        size_t a = (size_t)(img->near_tramp - img->mem.rx);
+        for (size_t pg = a / ps; pg < (a + img->near_tramp_size) / ps; pg++) prot[pg] = EXECMEM_R | EXECMEM_X;
     }
+    if (mixed) LOGI("macho: %zuK pages: segments share pages, those get the union of their permissions", ps / 1024);
+    for (size_t i = 0; i < npages;) {
+        size_t j = i;
+        while (j < npages && prot[j] == prot[i]) j++;
+        execmem_protect(&img->mem, i * ps, (j - i) * ps, prot[i]);
+        i = j;
+    }
+    free(prot);
 }
 
 struct ProgramVars {

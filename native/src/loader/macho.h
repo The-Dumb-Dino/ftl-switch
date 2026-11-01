@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "execmem.h"
+
 typedef struct mo_section {
     char segname[17];
     char sectname[17];
@@ -38,6 +40,7 @@ typedef struct mo_image {
     uint32_t fstarts_off, fstarts_size;
     uint8_t *near_tramp;  // RX after mo_protect; trampolines within +-128MB of the code
     size_t near_tramp_size, near_tramp_used;
+    execmem mem;          // the mapping holding the image and the near trampolines
 } mo_image;
 
 // Resolve an imported symbol. `dylib` is the install name it is imported from (may be NULL).
@@ -50,6 +53,11 @@ void mo_protect(mo_image *img);
 void mo_run_initializers(mo_image *img, int argc, const char **argv, const char **envp, const char **apple);
 mo_section *mo_find_section(mo_image *img, const char *seg, const char *sect);
 static inline void *mo_ptr(mo_image *img, uint64_t linkaddr) { return (void *)(uintptr_t)(linkaddr + img->slide); }
+// Writable view of the image at a link-time address (the same as mo_ptr on Linux).
+static inline void *mo_wptr(mo_image *img, uint64_t linkaddr) { return execmem_to_rw(&img->mem, mo_ptr(img, linkaddr)); }
+// n bytes (16-byte aligned) of near-trampoline space, before mo_protect; NULL when full.
+// Returns the executable address; write through execmem_to_rw(&img->mem, p).
+void *mo_tramp_alloc(mo_image *img, size_t n);
 
 // Unresolved-import diagnostics
 void mo_set_trap_handler(void (*fn)(const char *name));
