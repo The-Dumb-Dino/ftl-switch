@@ -33,7 +33,7 @@ New or changed in this project:
   `switch/`): the clang/lld toolchain for libnx, code memory under Horizon,
   touch, Joy-Cons, the keyboard and error applets, mods applied on the console
   with ftlman's engine (`switch/rust/`, `ftlman/switch.patch`), Hyperspace
-  linked in (`hyperspace/switch.patch`), the icon from your `.ipa`
+  linked in (its Switch target in the iPad fork, `buildscripts/switch/` there), the icon from your `.ipa`
   (`tools/ipa_icon.py`)
 - the Linux desktop app, `ftl-linux` (`native/src/platform/linux/`): SDL3
   window, EGL/GLES 3, mouse, keyboard, touchscreen and controller input, audio,

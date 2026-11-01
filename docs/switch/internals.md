@@ -124,9 +124,10 @@ as it is.
 
 ## Hyperspace
 
-It's the same Hyperspace as for Linux (`hyperspace/linux.patch` on the
-[iPad fork](https://github.com/Sidd065/FTL-Hyperspace)) plus
-`hyperspace/switch.patch`:
+It's the same Hyperspace as for Android and Linux, the
+[iPad fork](https://github.com/Sidd065/FTL-Hyperspace) (`android-arm64`), built
+with its Switch target (`buildscripts/switch/` there; `hyperspace/build-switch.sh`
+runs it):
 
 - a static library (`HS_IPAD_SWITCH`), built without vcpkg: only Boost's
   header-only parts are used, Lua 5.3 is compiled with the Switch toolchain,
@@ -146,4 +147,4 @@ It's the same Hyperspace as for Linux (`hyperspace/linux.patch` on the
   it keep logging the messages only.
 
 The new fields are optional and at the end of the structure, so the same
-Hyperspace source still builds for its Android host unchanged.
+Hyperspace source serves the Android app and ftl-linux, which don't pass them.
