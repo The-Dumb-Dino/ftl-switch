@@ -177,7 +177,6 @@ Class rt_define_class(const char *name, Class super, size_t instance_size);
 void rt_method(Class cls, const char *sel, void *imp);       // instance method
 void rt_cmethod(Class cls, const char *sel, void *imp);      // class method
 void rt_set_flags(Class cls, uint32_t flags);
-Class rt_metaclass(Class cls);
 void rt_register_image_objc(void *image /* mo_image* */);
 void rt_init(void);
 id rt_alloc_object(Class cls, size_t size);  // zeroed, refcount 1
@@ -187,7 +186,6 @@ bool rt_release(id obj);  // returns true if the object should be deallocated
 void rt_dealloc_object(id obj);
 id rt_autorelease(id obj);
 void rt_log_unrecognized(id self, SEL sel, Class cls);
-void rt_dump_class(Class cls);
 
 // Message send helpers with typed signatures.
 #define MSG(ret, ...) ((ret(*)(id, SEL, ##__VA_ARGS__))objc_msgSend)

@@ -261,11 +261,7 @@ int mo_load(const char *path, mo_image *img) {
 
 // --- unresolved import traps ---------------------------------------------------
 
-static void (*g_trap_handler)(const char *);
-void mo_set_trap_handler(void (*fn)(const char *name)) { g_trap_handler = fn; }
-
 void mo_trap_c(const char *name) {
-    if (g_trap_handler) g_trap_handler(name);
     LOGE("FATAL: call to unimplemented import %s", name);
     abort();
 }

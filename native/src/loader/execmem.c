@@ -1,4 +1,4 @@
-// execmem for POSIX hosts (Linux, Android): one anonymous mapping, rw == rx.
+// execmem for POSIX hosts (Linux): one anonymous mapping, rw == rx.
 #include "execmem.h"
 
 #include <errno.h>

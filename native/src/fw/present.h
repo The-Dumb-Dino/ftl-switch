@@ -12,7 +12,6 @@ void present_frame(GLuint game_fbo, int game_w, int game_h);
 void present_set_dest(present_rect r);
 present_rect present_get_dest(void);
 // surface pixel -> game drawable pixel; returns false if outside the game image
-bool present_map_point(double sx, double sy, double *gx, double *gy);
 // Called on the presenting thread just before swapping, for overlays.
 typedef void (*present_overlay_fn)(int surface_w, int surface_h, unsigned game_fbo, int game_w, int game_h);
 void present_set_overlay(present_overlay_fn fn);

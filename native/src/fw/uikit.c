@@ -443,7 +443,7 @@ static id dev_current(Class self, SEL _c) {
 }
 static id dev_systemVersion(id self, SEL _c) { (void)self; (void)_c; return ns_str("15.0"); }
 static id dev_model(id self, SEL _c) { (void)self; (void)_c; return ns_str("iPad"); }
-static id dev_name(id self, SEL _c) { (void)self; (void)_c; return ns_str("Android"); }
+static id dev_name(id self, SEL _c) { (void)self; (void)_c; return ns_str("iPad"); }
 static id dev_systemName(id self, SEL _c) { (void)self; (void)_c; return ns_str("iPadOS"); }
 static NSInteger dev_idiom(id self, SEL _c) { (void)self; (void)_c; return 1; }  // UIUserInterfaceIdiomPad
 static NSInteger dev_orientation(id self, SEL _c) { (void)self; (void)_c; return 3; }  // LandscapeLeft

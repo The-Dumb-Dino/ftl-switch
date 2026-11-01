@@ -32,15 +32,6 @@ void present_set_overlay(present_overlay_fn fn) { g_overlay = fn; }
 void present_set_post_hook(present_post_fn fn) { g_post = fn; }
 void present_set_view_fn(present_view_fn fn) { g_view = fn; }
 
-bool present_map_point(double sx, double sy, double *gx, double *gy) {
-    present_rect r = present_get_dest();
-    if (r.w <= 0 || r.h <= 0) return false;
-    double u = (sx - r.x) / r.w, v = (sy - r.y) / r.h;
-    *gx = u * g_display.render_w;
-    *gy = v * g_display.render_h;
-    return u >= 0 && u <= 1 && v >= 0 && v <= 1;
-}
-
 // Frame pacing stats, logged every 30 s: average rate and the longest gap.
 static void frame_stats(void) {
     static double t0, last, worst;

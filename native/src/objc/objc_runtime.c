@@ -341,7 +341,6 @@ static int realize_image_class(Class cls) {
 }
 
 // ---- class definition helpers (framework classes written in C) ----------------------------
-Class rt_metaclass(Class cls) { return cls->isa; }
 
 static Class g_root_meta;  // NSObject's metaclass
 
@@ -710,12 +709,6 @@ id objc_autorelease(id obj) {
 id objc_alloc(Class cls) {
     if (!cls) return nil;
     return ((id(*)(id, SEL))objc_msgSend)((id)cls, s_alloc);
-}
-
-void rt_dump_class(Class cls) {
-    if (!cls || !cls->rw) return;
-    LOGI("class %s size=%u flags=%#x super=%s", cls->rw->name, cls->rw->instance_size, cls->rw->flags,
-         cls->superclass && cls->superclass->rw ? cls->superclass->rw->name : "-");
 }
 
 // ---- image registration --------------------------------------------------------------

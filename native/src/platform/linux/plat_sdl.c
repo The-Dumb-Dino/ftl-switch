@@ -453,8 +453,8 @@ void port_on_game_exit(int code) {
 }
 
 // ---------------------------------------------------------------------------
-// input mapping: SDL -> Android key codes, which ux/ and pad.c speak
-static int android_key(const SDL_KeyboardEvent *k) {
+// input mapping: SDL -> the port's key codes (pad.c's K_*), which ux/ and pad.c speak
+static int port_key(const SDL_KeyboardEvent *k) {
     SDL_Keycode c = k->key;
     if (c >= 'a' && c <= 'z') return 29 + (int)(c - 'a');
     if (c >= '0' && c <= '9') return 7 + (int)(c - '0');
@@ -510,7 +510,7 @@ static int android_key(const SDL_KeyboardEvent *k) {
     }
 }
 
-static int android_pad_button(int b) {
+static int port_pad_button(int b) {
     switch (b) {
     case SDL_GAMEPAD_BUTTON_SOUTH: return 96;           // A
     case SDL_GAMEPAD_BUTTON_EAST: return 97;            // B
@@ -693,7 +693,7 @@ static void handle_event(const SDL_Event *e) {
             break;
         }
         if (k->repeat) break;
-        int code = android_key(k);
+        int code = port_key(k);
         if (code) ux_handle_key(code, k->down);
         break;
     }
@@ -779,7 +779,7 @@ static void handle_event(const SDL_Event *e) {
             }
             break;
         }
-        int code = android_pad_button(e->gbutton.button);
+        int code = port_pad_button(e->gbutton.button);
         if (code) ux_pad_button(code, e->gbutton.down);
         break;
     }

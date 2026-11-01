@@ -904,7 +904,6 @@ id NSSearchPathForDirectoriesInDomains_impl(NSUInteger dir, NSUInteger mask, BOO
 id NSHomeDirectory_impl(void) { return ns_str(g_docs_path); }
 id NSTemporaryDirectory_impl(void) { return ns_str(g_cache_path); }
 
-void NSLog_impl_cstr(const char *msg) { LOGI("[NSLog] %s", msg); }
 
 // constant NSString globals
 id g_NSDefaultRunLoopMode, g_NSRunLoopCommonModes;

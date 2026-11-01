@@ -1,7 +1,7 @@
 // Hyperspace (the mod loader PC mods like Multiverse build on), when the player turns
-// it on: libHyperspace.so from the APK's native library folder, started once the game
+// it on: Hyperspace.1.6.21.arm64.so (hyperspace/build-linux.sh), started once the game
 // is mapped, linked and protected, before any game code runs. It hooks the game in
-// memory. Built from github.com/Sidd065/FTL-Hyperspace (branch android-arm64).
+// memory. Built from github.com/Sidd065/FTL-Hyperspace (the iPad branch, android-arm64).
 #include "hyperspace.h"
 
 #include <dlfcn.h>
@@ -33,7 +33,7 @@ int hyperspace_start(const char *lib, const char *log_dir, const char *data_dir,
     }
     hs_android_init_fn init = (hs_android_init_fn)dlsym(h, "hs_android_init");
     if (!init) {
-        snprintf(err, errsize, "This libHyperspace.so isn't built for the Android port.");
+        snprintf(err, errsize, "This libHyperspace.so isn't built for the iPad game.");
         return -1;
     }
     hs_host_info info = {

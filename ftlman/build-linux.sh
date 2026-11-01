@@ -3,8 +3,7 @@
 # for ftl-linux's portable folder and `ftl-linux --ftlman`.
 #   ftlman/build-linux.sh   -> ~/ftl-build/ftlman-linux/ftlman
 # Upstream ftlman at a fixed release, unchanged; only the "portable-release"
-# feature, so it keeps its settings and mods next to itself. (The Android build,
-# build.sh, needs headless.patch; Linux doesn't.) Needs a nightly Rust toolchain
+# feature, so it keeps its settings and mods next to itself. Needs a nightly Rust toolchain
 # (rustup) and fontconfig (fontconfig-devel, or just the library: see below).
 set -euo pipefail
 SRC=${FTLMAN_SRC:-$HOME/ftl-build/ftlman-src}
@@ -18,7 +17,7 @@ if [ ! -d "$SRC/.git" ]; then
 fi
 git -C "$SRC" fetch -q origin
 git -C "$SRC" checkout -q -f "$COMMIT"
-git -C "$SRC" reset -q --hard "$COMMIT"  # drops the Android build's patch, if that tree was used for it
+git -C "$SRC" reset -q --hard "$COMMIT"  # drops other builds' patches, if that tree was used for them
 
 # ftlman links fontconfig (its window finds fonts with it) but needs no headers:
 # without fontconfig-devel, point pkg-config at the installed library.
@@ -37,7 +36,7 @@ fi
 
 # Linked for any page size (4K, 16K, 64K kernels).
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=65536"
-export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$SRC/target-linux}  # apart from the Android build's
+export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$SRC/target-linux}  # apart from other builds
 (cd "$SRC" && "$CARGO" build --locked --release --features portable-release)
 
 mkdir -p "$OUT"

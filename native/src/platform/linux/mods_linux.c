@@ -317,7 +317,6 @@ void mods_prepare(void) {
 const char *mods_active_index(void) { return g_index[0] ? g_index : NULL; }
 bool mods_hyperspace_applied(void) { return g_hyperspace; }
 bool mods_take_changed(void) { return g_changed; }
-bool mods_present(void) { return g_modded; }
 
 // ---------------------------------------------------------------------------
 // ftlman: settings.ini "ftlman", else next to ftl-linux (or its libexec), else PATH

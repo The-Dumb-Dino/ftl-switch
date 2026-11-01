@@ -1,5 +1,5 @@
 // Platform abstraction between the iOS framework emulation and the host
-// (Android via JNI/EGL/AAudio, or the Linux test harness).
+// (ftl-linux on SDL3, or the test harness).
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>

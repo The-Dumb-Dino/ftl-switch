@@ -51,7 +51,6 @@ static const char *g_mods_index;
 const char *port_mods_index(void) { return g_mods_index; }
 
 mo_image *port_image(void) { return &g_img; }
-uintptr_t port_image_slide(void) { return (uintptr_t)g_img.slide; }
 
 int port_run_game(const port_config *cfg) {
     strncpy(g_bundle_path, cfg->bundle_dir, sizeof g_bundle_path - 1);

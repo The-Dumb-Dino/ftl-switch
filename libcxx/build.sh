@@ -2,14 +2,12 @@
 # Builds libc++/libc++abi/libunwind (LLVM 19) with Apple arm64 ABI settings
 # for loading iOS binaries: alternate std::string layout, non-unique RTTI bit,
 # Darwin ctype masks, and libunwind able to walk Mach-O compact-unwind frames.
-#   ./build.sh android   -> out/android/lib/*.a
 #   ./build.sh linux     -> out/linux/lib/*.a   (aarch64 glibc: native build on an
 #                           aarch64 host, else cross with SYSROOT=~/arm64-root)
 set -euo pipefail
-TARGET=${1:-android}
+TARGET=${1:-linux}
 HERE=$(cd "$(dirname "$0")" && pwd)
 LLVM_SRC=${LLVM_SRC:-$HOME/src/llvm-project-19.1.7.src}
-NDK=${NDK:-$HOME/android-sdk/ndk/28.2.13676358}
 OUT=${LIBCXX_OUT:-$HOME/ftl-build/libcxx}/$TARGET
 BUILD=${LIBCXX_BUILD:-$HOME/ftl-build/libcxx-build}-$TARGET
 ABI_DEFINES="_LIBCPP_ABI_ALTERNATE_STRING_LAYOUT"
@@ -44,12 +42,7 @@ COMMON=(
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
   -DLIBCXX_USE_COMPILER_RT=ON -DLIBCXXABI_USE_COMPILER_RT=ON -DLIBUNWIND_USE_COMPILER_RT=ON
 )
-if [ "$TARGET" = android ]; then
-  cmake "${COMMON[@]}" \
-    -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DANDROID_STL=none \
-    -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer $EXTRA_CXX" -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
-else
+if [ "$TARGET" = linux ]; then
   # On an aarch64 host build natively; otherwise cross-compile against a sysroot.
   SYSROOT_ARGS=()
   if [ "$(uname -m)" != aarch64 ] || [ -n "${SYSROOT:-}" ]; then
@@ -67,6 +60,9 @@ else
     -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=lld" \
     -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
     -DPython3_EXECUTABLE=/usr/bin/python3 -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
+else
+  echo "unknown target $TARGET (linux)" >&2
+  exit 1
 fi
 ninja -C "$BUILD" cxx cxxabi unwind
 ninja -C "$BUILD" install-cxx install-cxxabi install-unwind

@@ -4,6 +4,4 @@ libcxx/*.log
 build*/
 *.o
 *.so
-*.apk
-*.idsig
 __pycache__/

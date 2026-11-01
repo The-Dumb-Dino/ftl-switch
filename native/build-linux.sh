@@ -16,7 +16,7 @@ if [ ! -f "$LIBCXX/lib/libc++.a" ]; then
   echo "libc++ with Apple's ABI is missing: run libcxx/build.sh linux first" >&2
   exit 1
 fi
-cmake -G Ninja -S "$HERE" -B "$BUILD" -DFTL_LINUX_APP=ON \
+cmake -G Ninja -S "$HERE" -B "$BUILD" \
   -DCMAKE_C_COMPILER=clang -DCMAKE_ASM_COMPILER=clang \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="${PREFIX:-$HOME/.local}" \
   -DFTL_LINUX_VERSION="$VERSION" -DLIBCXX_DIR="$LIBCXX" -DFTLMAN_BIN="$FTLMAN" -DHYPERSPACE_SO="$HYPERSPACE" >/dev/null

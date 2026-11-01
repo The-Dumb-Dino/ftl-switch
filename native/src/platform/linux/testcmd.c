@@ -1,7 +1,7 @@
 // Scripted testing of the real app (FTL_TEST_CMD=/path/to/fifo): commands on a
 // FIFO, in window pixels, one per line:
 //   click x y | rclick x y | down x y | up x y | move x y | wheel x y steps |
-//   key <android keycode> | keydown <code> | keyup <code> | text <reply for text prompts> |
+//   key <key code> | keydown <code> | keyup <code> | text <reply for text prompts> |
 //   back | shot file.png | fullscreen | pause | resume | quit |
 //   padattach | padbtn <SDL_GamepadButton> <0|1> | padaxis <SDL_GamepadAxis> <-32768..32767> |
 //   audio (logs the output's peak level since the last 'audio')

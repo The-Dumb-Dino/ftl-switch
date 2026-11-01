@@ -122,7 +122,6 @@ int32_t AudioOutputUnitStop_impl(void *u) {
 }
 
 // AudioSession C API (older API): accept everything.
-int32_t AudioSession_ok_impl(void) { return 0; }
 
 // ---------------------------------------------------------------------------
 // AVAudioSession

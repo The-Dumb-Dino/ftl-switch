@@ -1,7 +1,6 @@
 // Importing the player's own FTL for iPad: the files the port needs (the iOS
 // executable FTL and the data package ftl.dat, plus Info.plist for the version)
 // from an .ipa (a zip), an extracted FTL.app, or a folder holding Payload/FTL.app.
-// Same checks as the Android app's Importer.java.
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <errno.h>

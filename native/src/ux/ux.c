@@ -1,11 +1,11 @@
-// Phone UX layer for the FTL iPad build:
+// Touch and desktop UX layer for the FTL iPad build:
 //  - screen layout / render resolution (render at a multiple of 768 px tall)
 //  - zoomable view (pinch to zoom, two-finger pan) presented by present.c
 //  - gestures: two-finger tap toggles pause; one finger held and a tap with another
 //    is a right click for mods that listen for one; single touches go to the game
-//  - Android Back -> Escape; hardware keyboard + mouse -> the game's own
+//  - Back -> Escape; hardware keyboard + mouse -> the game's own
 //    (desktop-heritage) key and mouse events
-//  - the beacon map and the upgrade screen zoomed in on phones (events too, as
+//  - the beacon map and the upgrade screen zoomed in on small screens (events too, as
 //    an option); event text size; continuing the saved run at launch
 //  - game logger hook for diagnostics; mods (mods.c)
 #include "ux.h"
@@ -183,15 +183,6 @@ int ux_patches_apply(mo_image *img) {
 // ---------------------------------------------------------------------------------
 // game state probes
 static void *capp(void) { return g_img ? *(void **)mo_ptr(g_img, G_CAPP_PTR) : NULL; }
-uint8_t *ux_capp(void) { return capp(); }
-bool ux_in_main_menu(void) {
-    uint8_t *a = capp();
-    return a && (a[CAPP_MENU] || a[CAPP_STARTUP]);
-}
-bool ux_in_game(void) {
-    uint8_t *a = capp();
-    return a && !a[CAPP_MENU] && !a[CAPP_STARTUP];
-}
 // main menu showing with no sub-screen (options, stats, hangar, ...) open
 static bool at_top_menu(void) {
     uint8_t *a = capp();
@@ -611,8 +602,8 @@ void ux_quit(void) {
     fw_run_on_main(quit_fallback, NULL, false);
 }
 
-// Android KEYCODE_* -> SIL key codes (the game's own SIL -> SDL table is at 0x1000090a8)
-int ux_android_key_to_sil(int k) {
+// port key codes (the K_* numbering, see pad.c) -> SIL key codes (the game's own SIL -> SDL table is at 0x1000090a8)
+int ux_key_to_sil(int k) {
     if (k >= 29 && k <= 54) return 1 + (k - 29);  // A..Z
     if (k >= 7 && k <= 16) return 27 + (k - 7);   // 0..9
     switch (k) {
@@ -663,8 +654,8 @@ int ux_android_key_to_sil(int k) {
     return 0;
 }
 
-void ux_handle_key(int android_keycode, bool down) {
-    int sil = ux_android_key_to_sil(android_keycode);
+void ux_handle_key(int keycode, bool down) {
+    int sil = ux_key_to_sil(keycode);
     if (!sil) return;
     if (!g_keyboard_used) LOGI("ux: hardware keyboard in use; enabling shortcuts");
     g_keyboard_used = true;
@@ -703,7 +694,7 @@ static void mouse_right(int action, double sx, double sy) {
 
 // action: 0 move, 1 left down, 2 left up, 3 right down, 4 right up, 5 middle down, 6 middle up, 7 wheel
 void ux_handle_mouse(int action, float sx, float sy, float wheel) {
-    // Android may replay a resting pointer's hover; only real motion or a
+    // A resting pointer's hover may be replayed; only real motion or a
     // button hands control from the gamepad cursor to the mouse.
     static float last_x = -1, last_y = -1;
     bool moved = fabsf(sx - last_x) > 2 || fabsf(sy - last_y) > 2;
@@ -902,8 +893,7 @@ static void autozoom_tick(void) {
     overlay_minimap_hide(false);
 }
 
-// Android often ends the app while it's in the background, which on iOS was
-// rare: come back to the run, not the title screen. Once, right after launch.
+// resume_run: come back to the run, not the title screen. Once, right after launch.
 static void resume_run_tick(void) {
     static bool done;
     static double t_menu;
@@ -925,16 +915,9 @@ static void resume_run_tick(void) {
     *(int32_t *)(menu + MENU_ITEM) = 9;
 }
 
-// The title screen (or the first-launch language screen) has been up: the game is past
-// loading, which with big mods can go a long while without drawing.
-static bool g_started;
-bool ux_game_started(void) { return __atomic_load_n(&g_started, __ATOMIC_RELAXED); }
-
 // Main thread, every run-loop pass: resuming at launch, event text and window zoom, the
 // gamepad cursor (pad.c).
 void ux_tick(void) {
-    uint8_t *a = capp();
-    if (a && (a[CAPP_MENU] || a[CAPP_STARTUP])) __atomic_store_n(&g_started, true, __ATOMIC_RELAXED);
     resume_run_tick();
     apply_event_font();
     autozoom_tick();

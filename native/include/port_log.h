@@ -1,24 +1,13 @@
 #pragma once
 #include <stdio.h>
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#define PORT_TAG "FTLPort"
-// logcat, plus the session log file once port_log_open has run (log_android.c)
-void port_log(int prio, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
-void port_log_open(const char *dir);
-void port_log_mark_crash(void);  // async-signal-safe
-// Memory in MB: free on the device, its total, and what the game holds (0 where unknown)
-void port_memory(long *free_mb, long *total_mb, long *game_mb);
-#define LOGI(...) port_log(ANDROID_LOG_INFO, __VA_ARGS__)
-#define LOGW(...) port_log(ANDROID_LOG_WARN, __VA_ARGS__)
-#define LOGE(...) port_log(ANDROID_LOG_ERROR, __VA_ARGS__)
-#elif defined(FTL_LINUX_APP)
+#ifdef FTL_LINUX_APP
 // stderr, plus the session log file once port_log_open has run (platform/linux/log_linux.c)
 enum { PORT_LOG_INFO = 4, PORT_LOG_WARN = 5, PORT_LOG_ERROR = 6 };
 void port_log(int prio, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void port_log_open(const char *dir);
 void port_log_mark_crash(void);  // async-signal-safe
+// Memory in MB: free on the machine, its total, and what the game holds (0 where unknown)
 void port_memory(long *free_mb, long *total_mb, long *game_mb);
 #define LOGI(...) port_log(PORT_LOG_INFO, __VA_ARGS__)
 #define LOGW(...) port_log(PORT_LOG_WARN, __VA_ARGS__)

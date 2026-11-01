@@ -191,7 +191,7 @@ static const GLubyte *GL_APIENTRY wrap_glGetString(GLenum name) {
 }
 
 // iOS accepts GL_BGRA (APPLE_texture_format_BGRA8888) for textures; most
-// Android drivers don't (at least not for glTexStorage2D). Store such
+// other drivers don't (at least not for glTexStorage2D). Store such
 // textures as RGBA and swizzle client-side uploads/readbacks.
 #define GL_BGRA_EXT_ 0x80E1
 #define GL_BGRA8_EXT_ 0x93A1

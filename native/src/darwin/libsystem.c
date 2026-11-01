@@ -1,6 +1,6 @@
 // Darwin libSystem shim: translates the iOS C-library ABI (struct layouts,
 // flag values, variadic convention, pthread object formats, Mach APIs) onto
-// the host libc (bionic on Android, glibc for the Linux test harness).
+// the host libc (glibc).
 #define _GNU_SOURCE
 #include "libsystem.h"
 
@@ -777,34 +777,12 @@ int darwin_semaphore_signal_all(uint32_t s) {
     pthread_mutex_unlock(&m->m);
     return 0;
 }
-// Threads parked in a semaphore wait (e.g. the game thread while the app is
-// suspended) run the platform's wait hook every 50 ms, so the GL thread can
-// still give up its window surface when Android destroys it.
-static void (*g_wait_hook)(void);
-void darwin_set_wait_hook(void (*fn)(void)) { g_wait_hook = fn; }
-static int sem_wait_slice(msem *m, const struct timespec *deadline) {
-    struct timespec now, t;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    t = now;
-    t.tv_nsec += 50000000L;
-    if (t.tv_nsec >= 1000000000L) { t.tv_sec++; t.tv_nsec -= 1000000000L; }
-    bool last = deadline && (deadline->tv_sec < t.tv_sec || (deadline->tv_sec == t.tv_sec && deadline->tv_nsec <= t.tv_nsec));
-    int r = pthread_cond_timedwait(&m->c, &m->m, last ? deadline : &t);
-    if (r == ETIMEDOUT && !last) {
-        pthread_mutex_unlock(&m->m);
-        g_wait_hook();
-        pthread_mutex_lock(&m->m);
-        return 0;
-    }
-    return r;
-}
 int darwin_semaphore_wait(uint32_t s) {
     msem *m = sem_get(s);
     if (!m) return 15;
     pthread_mutex_lock(&m->m);
     while (m->count <= 0) {
-        if (g_wait_hook) sem_wait_slice(m, NULL);
-        else pthread_cond_wait(&m->c, &m->m);
+        pthread_cond_wait(&m->c, &m->m);
     }
     m->count--;
     pthread_mutex_unlock(&m->m);
@@ -823,7 +801,7 @@ int darwin_semaphore_timedwait(uint32_t s, uint64_t ts_packed) {
     pthread_mutex_lock(&m->m);
     int rc = 0;
     while (m->count <= 0) {
-        int r = g_wait_hook ? sem_wait_slice(m, &dl) : pthread_cond_timedwait(&m->c, &m->m, &dl);
+        int r = pthread_cond_timedwait(&m->c, &m->m, &dl);
         if (r == ETIMEDOUT) { rc = 49; break; }  // KERN_OPERATION_TIMED_OUT
     }
     if (!rc) m->count--;

@@ -1,5 +1,5 @@
 // PVRTC1 (2bpp / 4bpp) decoder -> RGBA8. iOS GPUs sample PVRTC natively;
-// most Android GPUs can't, so compressed uploads are expanded on the CPU.
+// most other GPUs can't, so compressed uploads are expanded on the CPU.
 #include "pvrtc.h"
 
 #include <stdlib.h>

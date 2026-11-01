@@ -1,7 +1,7 @@
 // Assembly helpers for Darwin ABI differences.
 //
 // Apple arm64 passes *all* variadic arguments on the stack (8-byte slots),
-// while AAPCS64 (Linux/Android) uses registers first. These trampolines hand
+// while AAPCS64 (Linux) uses registers first. These trampolines hand
 // the address of the variadic stack area to C implementations which build an
 // AAPCS64 va_list pointing at it.
 

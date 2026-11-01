@@ -19,7 +19,6 @@ void port_on_game_exit(int code);            // platform: game called exit()
 
 struct mo_image;
 struct mo_image *port_image(void);
-uintptr_t port_image_slide(void);
 const char *port_mods_index(void);
 void port_install_crash_handler(void);
 void port_backtrace_from(uintptr_t pc, uintptr_t lr, uintptr_t fp, const char *why);

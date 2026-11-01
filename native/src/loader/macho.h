@@ -60,4 +60,3 @@ static inline void *mo_wptr(mo_image *img, uint64_t linkaddr) { return execmem_t
 void *mo_tramp_alloc(mo_image *img, size_t n);
 
 // Unresolved-import diagnostics
-void mo_set_trap_handler(void (*fn)(const char *name));

@@ -59,18 +59,12 @@ const zip_entry *zip_at(zip_file *z, int i);
 int zip_extract(zip_file *z, const zip_entry *e, int (*fn)(void *ud, const void *buf, size_t n), void *ud);
 int zip_extract_to(zip_file *z, const zip_entry *e, const char *path);
 void zip_close(zip_file *z);
-void *zip_read_all(zip_file *z, const zip_entry *e, size_t *len);  // malloc'd, 0-terminated; NULL on error
-typedef struct zip_writer zip_writer;
-zip_writer *zip_create(const char *path);
-int zip_add(zip_writer *w, const char *name, const void *data, size_t len);
-int zip_finish(zip_writer *w);  // writes the directory and closes; 0 on success
 
 // ---- mods (mods_linux.c): ftlman patches game/ftl.dat, the port adapts at launch ----
 void mods_prepare(void);              // looks at ftl.dat; makes the image overlay if it's modded
 const char *mods_active_index(void);  // the overlay to start the game with, or NULL
 bool mods_take_changed(void);         // ftl.dat changed since the last start
 bool mods_hyperspace_applied(void);
-bool mods_present(void);              // ftl.dat has mods in it
 bool find_ftlman(char *out, size_t n);
 bool find_hyperspace(char *out, size_t n);  // Hyperspace for the iPad game, if installed
 int ftlman_configure(const char *ftlman_dir, const char *game_dir);  // its settings.json points at the game

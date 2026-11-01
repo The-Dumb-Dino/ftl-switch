@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 // ux.c
-uint8_t *ux_capp(void);               // CApp *, or NULL before the game runs
 int ux_toggle_pause(void);            // the new state, -1 when not in a run
 bool ux_paused(void);                 // in a run, and paused
 void ux_target_view(double v[4]);     // where the view is going: x0, y0, x1, y1 in game px

@@ -51,7 +51,7 @@ enum {
     ACT_COUNT
 };
 
-// Android key codes
+// the port's key codes (what the platform layers send)
 enum {
     K_DPAD_UP = 19, K_DPAD_DOWN = 20, K_DPAD_LEFT = 21, K_DPAD_RIGHT = 22,
     K_A = 96, K_B = 97, K_X = 99, K_L1 = 102, K_R1 = 103, K_L2 = 104, K_R2 = 105,
@@ -345,7 +345,7 @@ void ux_pad_connected(bool connected, const char *name) {
     if (!ux_paused() && ux_toggle_pause() == 1) overlay_flash(OVERLAY_ICON_PAUSE);
 }
 
-// Android KEYCODE_BUTTON_* / DPAD_* from a gamepad
+// K_* buttons / d-pad from a gamepad
 void ux_pad_button(int k, bool down) {
     if (k >= K_DPAD_UP && k <= K_DPAD_RIGHT) {
         g_pad.dir_key[k - K_DPAD_UP] = down;
@@ -364,7 +364,7 @@ static float deadzone(float v) {
     return (v - copysignf(dz, v)) / (1 - dz);
 }
 
-// axes: left x/y, right x/y, left/right trigger, hat x/y (Android: y down)
+// axes: left x/y, right x/y, left/right trigger, hat x/y (y down)
 void ux_pad_axes(const float *ax) {
     g_pad.lx = deadzone(ax[0]);
     g_pad.ly = deadzone(ax[1]);

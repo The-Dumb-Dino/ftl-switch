@@ -5,16 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting this. The app's logs help the most: they show what the game was doing and what went wrong, along with your phone's model, its Android version, the app's version and its settings. Nothing personal is in them.
+        Thanks for reporting this. The session logs help the most: they show what the game was doing and what went wrong, along with the machine, the kernel's page size, ftl-linux's version and its settings. Nothing personal is in them.
 
-        **Saving the logs**
-
-        1. Long-press the FTL app icon and tap **Settings**.
-        2. Scroll down to **Troubleshooting** and tap **Save logs…**.
-        3. Pick where to save the zip, for example Downloads.
-        4. Attach the zip in the **Logs** box below: drag it in, or click the bar under the box and pick it.
-
-        If FTL closed unexpectedly, it says so the next time it starts: tap **Save logs…** there. The app keeps only its last few sessions, so save the logs soon after the problem.
+        `ftl-linux --paths` shows the log folder (`~/.local/state/ftl-linux` when installed, `data/logs` in a portable folder). The last five sessions are kept, so attach the newest `session-*.txt` soon after the problem.
 
   - type: textarea
     id: what-happened
@@ -32,33 +25,35 @@ body:
       placeholder: |
         1. Start a new game with the Kestrel
         2. Open the map and jump to the second beacon
-        3. Tap the first answer in the event
+        3. Click the first answer in the event
 
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: The zip from **Settings** > **Troubleshooting** > **Save logs…**, as described above.
+      description: The session log(s), as described above. With Hyperspace, zhl.log and FTL_HS.log too.
 
   - type: textarea
     id: screenshots
     attributes:
       label: Screenshots or a screen recording
-      description: >-
-        A picture often shows a problem faster than words, above all something drawn wrong, cut off or hard to tap.
-        For a screenshot, press Power and Volume down together. To record the screen, swipe down from the top and
-        tap **Screen record** in the quick settings. GitHub takes videos up to 10 MB, so keep recordings short.
+      description: A picture often shows a problem faster than words, above all something drawn wrong or cut off.
 
   - type: textarea
     id: mods
     attributes:
       label: Mods
-      description: >-
-        The mods that are applied, in their order on the Mods screen (top first). Write "none" if you play without
-        mods.
+      description: The mods applied in ftlman, in its order (top first). Write "none" if you play without mods.
       placeholder: Hyperspace.ftl, Multiverse Assets, Multiverse Data
     validations:
       required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: Machine and distribution
+      description: Only needed if you can't attach the logs, which include them.
+      placeholder: MacBook Air M1, Fedora Asahi Remix 42, KDE on Wayland
 
   - type: input
     id: controller
@@ -66,20 +61,3 @@ body:
       label: Game controller
       description: If it's about a controller, which one, and is it connected by USB or Bluetooth?
       placeholder: DualSense, Bluetooth
-
-  - type: input
-    id: device
-    attributes:
-      label: Phone or tablet, Android version and app version
-      description: >-
-        Only needed if you can't attach the logs, which include them. The app's version is in Android's settings,
-        under Apps > FTL.
-      placeholder: Pixel 8, Android 15, 0.4.1
-
-  - type: textarea
-    id: saves
-    attributes:
-      label: Saves
-      description: >-
-        If the problem is tied to a run, like a save that won't load or a crash at the same point every time, attach
-        your saves too: **Settings** > **Export saves…** makes a zip of your run and profile.
