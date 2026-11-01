@@ -37,9 +37,9 @@ Multiverse and other big mods build on, changes the game's code as well as its
 data. The iPad game's Hyperspace (the `android-arm64` branch of
 [Sidd065/FTL-Hyperspace](https://github.com/Sidd065/FTL-Hyperspace)) builds
 for Linux with `hyperspace/build-linux.sh` (see [building.md](building.md#optional-hyperspace)).
-`hyperspace/linux.patch` adds the Linux target to that fork: the fork's iPad
-code paths (`HS_ANDROID`) with the host's clang and glibc, and the
-`arm64-linux-ftl` vcpkg triplet with the port's libc++.
+The fork has a Linux target (its `buildscripts/linux/`): the iPad code paths
+(`HS_ANDROID`) with the host's clang and glibc, and the `arm64-linux-ftl`
+vcpkg triplet with the port's libc++.
 
 Installing works as on PC, without the launch script: on PC the `.so` goes next
 to `FTL.amd64` and the `FTL` script is edited to `LD_PRELOAD` it. The iPad game

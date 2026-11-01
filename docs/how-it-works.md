@@ -164,10 +164,10 @@ shown.
 For mods' right clicks, `ux.c` asks it whether a script listens for the right
 button (`hs_android_wants_right_click`) and, if so, sends it the touch gesture
 (one finger held, a tap with another) and the mouse's right button
-(`hs_android_right_button`). `hyperspace/` builds it (`linux.patch` on top of
-the fork; on the Switch it is linked in, see
+(`hs_android_right_button`). `hyperspace/` builds it with the fork's
+`buildscripts/linux/` (on the Switch `buildscripts/switch/`, and it is linked in, see
 [switch/internals.md](switch/internals.md#hyperspace)).
 
-The `hs_android_*` names and the `HS_ANDROID` code paths are kept on purpose:
-the interface is shared with the fork's Android host, and the Linux and Switch
-changes are meant to be merged back into it.
+The `hs_android_*` names and the `HS_ANDROID` code paths are the fork's: one
+Hyperspace source serves the Android app, ftl-linux and the Switch port, with the
+same interface.

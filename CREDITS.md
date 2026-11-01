@@ -43,8 +43,8 @@ New or changed in this project:
 - a loader that works with any host page size (4K, 16K, 64K) and keeps
   executable memory behind one interface (`loader/execmem.h`)
 - mods with stock ftlman as a native Linux program (`ftlman/`)
-- Hyperspace for Linux: `hyperspace/linux.patch` and the build scripts, and the
-  host side starting it like a drop-in
+- Hyperspace for Linux: its Linux target in the iPad fork (`buildscripts/linux/`
+  there), the build scripts here, and the host side starting it like a drop-in
 - removal of the Android app and its code, and of code nothing calls any more
 - the documentation in `docs/`
 
