@@ -79,7 +79,7 @@ of the `.nro`'s segments, nor the GPU driver's memory limits. A build that runs
 there can still crash on a console; see [internals.md](internals.md#relocations-and-read-only-memory).
 
 Logs reach Ryujinx's own log (as `OutputDebugString`), and the `screenshot`
-file (see [playing.md](playing.md#logs-and-screenshots)) works there too.
+file (see [playing.md](playing.md#problems)) works there too.
 
 ## Crash addresses
 

@@ -25,8 +25,9 @@ left; see [CREDITS.md](CREDITS.md) for what came from there and what's new.
 
 1. Copy `ftl.nro` and your FTL for iPad `.ipa` (1.6.21, decrypted; the App
    Store copy is FairPlay-encrypted and can't be used) to `sdmc:/switch/ftl/`.
-2. Start FTL with a game's memory: hold **R** while starting any game and pick
-   FTL in the Homebrew Menu, or use an NSP forwarder.
+2. Start FTL with a game's memory: best through an NSP forwarder (made with a
+   tool like Sphaira). Without one, hold **R** while starting any game and pick
+   FTL in the Homebrew Menu; from the Album (gallery) it doesn't work.
 3. The first start imports the game (a minute or so). Mods go in
    `sdmc:/switch/ftl/mods/`.
 
