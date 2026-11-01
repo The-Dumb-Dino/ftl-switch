@@ -19,9 +19,7 @@ Renegade Collection.
 This project is based on [ftl-android](https://github.com/Sidd065/ftl-android)
 by Sidd065, whose loader, Objective-C runtime and iOS frameworks it runs on.
 It has been reworked extensively and none of ftl-android's Android code is
-left; see [CREDITS.md](CREDITS.md) for what came from there and what's
-new. The same code also builds the Linux desktop version, `ftl-linux`, whose
-own repository is **ftl-linux**.
+left; see [CREDITS.md](CREDITS.md) for what came from there and what's new.
 
 ## Quick start
 
@@ -43,7 +41,6 @@ To build `ftl.nro` yourself, see [docs/switch/building.md](docs/switch/building.
 | [Building](docs/switch/building.md) | Toolchain, build steps, the icon, testing in Ryujinx |
 | [How the Switch port works](docs/switch/internals.md) | Toolchain, code memory under Horizon, ftlman and Hyperspace in one `.nro` |
 | [How it works](docs/how-it-works.md) | The shared core: the loader, the runtime, the frameworks, the hooks |
-| [ftl-linux](docs/linux/usage.md) | The Linux version, which builds from the same code ([building](docs/linux/building.md), [mods](docs/linux/mods.md), [testing](docs/testing.md)) |
 
 ## Reporting bugs
 
