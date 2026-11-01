@@ -1,0 +1,560 @@
+diff --git a/.devcontainer/toolchains/switch-ftl.cmake b/.devcontainer/toolchains/switch-ftl.cmake
+new file mode 100644
+index 0000000..50af347
+--- /dev/null
++++ b/.devcontainer/toolchains/switch-ftl.cmake
+@@ -0,0 +1,19 @@
++# FTL for iPad run by ftl.nro, the Switch homebrew port (ftl-android's switch/): the
++# port's Switch toolchain (host clang/lld, devkitPro's newlib and libnx) plus, as for
++# Android and Linux, the port's libc++ with Apple's arm64 C++ ABI.
++#   FTL_SWITCH_TOOLCHAIN: the port's switch/toolchain.cmake
++#   FTL_LIBCXX: output of the port's `libcxx/build.sh switch`
++foreach(var FTL_SWITCH_TOOLCHAIN FTL_LIBCXX)
++    if(NOT DEFINED ENV{${var}})
++        message(FATAL_ERROR "${var} is not set (see hyperspace/build-switch.sh in ftl-android)")
++    endif()
++endforeach()
++include("$ENV{FTL_SWITCH_TOOLCHAIN}")
++if(NOT _FTL_SWITCH_CXX)
++    set(_FTL_SWITCH_CXX 1)
++    string(APPEND CMAKE_C_FLAGS " -fsigned-char")
++    # libc++'s headers before the C library's (the toolchain's -isystem paths)
++    set(CMAKE_CXX_FLAGS "-isystem $ENV{FTL_LIBCXX}/include/c++/v1 ${CMAKE_CXX_FLAGS}")
++    string(APPEND CMAKE_CXX_FLAGS " -fsigned-char -fc++-abi=arm"
++        " -D_LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION=3 -D_LIBCPP_DARWIN_CTYPE_ABI -D_GNU_SOURCE=")
++endif()
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 51a3bd0..2b6cca4 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,7 +12,11 @@ include(GeneratedSources)
+ # FTL for iPad, run by the port (ftl-android): on Android, or natively on aarch64
+ # Linux (ftl-linux, the arm64-linux-ftl triplet). Both build the same iPad code paths.
+ option(HS_IPAD_LINUX "Build for FTL for iPad run by ftl-linux on aarch64 Linux" OFF)
+-if(ANDROID OR HS_IPAD_LINUX)
++# ...or as a static library linked into ftl.nro, the Switch homebrew port (no vcpkg:
++# HS_DEPS has Boost's headers, Lua 5.3 and minizip/zlib built for the Switch)
++option(HS_IPAD_SWITCH "Build for FTL for iPad run by ftl.nro on the Switch (static library)" OFF)
++set(HS_DEPS "" CACHE PATH "Switch: include/ and lib/ with Boost headers, Lua 5.3, minizip and zlib")
++if(ANDROID OR HS_IPAD_LINUX OR HS_IPAD_SWITCH)
+     set(HS_IPAD_PORT ON)
+ else()
+     set(HS_IPAD_PORT OFF)
+@@ -23,6 +27,17 @@ if(APPLE)
+     set(BUILD_SHARED_LIBS OFF)
+ endif()
+ 
++if(HS_IPAD_SWITCH)
++    # Only Boost's header-only parts are used (filesystem is for the crash reporter, left out)
++    set(Boost_INCLUDE_DIRS "${HS_DEPS}/include")
++    set(LUA_INCLUDE_DIR "${HS_DEPS}/include")
++    set(LUA_LIBRARIES "${HS_DEPS}/lib/liblua.a")
++    add_library(minizip::minizip INTERFACE IMPORTED)
++    set_target_properties(minizip::minizip PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${HS_DEPS}/include")
++    add_library(ZLIB::ZLIB INTERFACE IMPORTED)
++    add_library(Boost::filesystem INTERFACE IMPORTED)
++    add_library(Threads::Threads INTERFACE IMPORTED)
++else()
+ # Let vcpkg handle Boost automatically
+ find_package(Boost REQUIRED COMPONENTS filesystem system)
+ 
+@@ -32,6 +47,7 @@ find_package(Lua REQUIRED)
+ # Let vcpkg handle minizip automatically
+ find_package(minizip REQUIRED)
+ find_package(ZLIB REQUIRED)
++endif()
+ 
+ # Let vcpkg handle SDL3 automatically (FTL for iPad, run on Android, has no SDL)
+ if(NOT HS_IPAD_PORT)
+@@ -42,9 +58,11 @@ if(WIN32)
+     find_package(OpenGL REQUIRED)
+ endif()
+ 
+-# pthread
+-set(THREADS_PREFER_PTHREAD_FLAG ON)
+-find_package(Threads REQUIRED)
++# pthread (newlib's on the Switch, given above)
++if(NOT HS_IPAD_SWITCH)
++    set(THREADS_PREFER_PTHREAD_FLAG ON)
++    find_package(Threads REQUIRED)
++endif()
+ 
+ # SWIG
+ find_package(SWIG REQUIRED COMPONENTS lua)
+@@ -68,9 +86,14 @@ endif()
+ # Name the binary as Hyperspace.dll instead of libHyperspace.dll
+ set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
+ 
++if(HS_IPAD_SWITCH)
++    set(HS_LIBRARY_TYPE STATIC)  # linked into ftl.nro: Horizon has no dynamic loader
++else()
++    set(HS_LIBRARY_TYPE SHARED)
++endif()
+ swig_add_library(
+     Hyperspace
+-    TYPE SHARED
++    TYPE ${HS_LIBRARY_TYPE}
+     LANGUAGE lua
+     SOURCES ${swigfiles}
+ )
+@@ -254,7 +277,11 @@ if(HS_IPAD_PORT)
+         target_link_libraries(Hyperspace PRIVATE log)
+     else()
+         # Not Android: the iPad code paths (HS_ANDROID) without bionic
+-        target_compile_definitions(Hyperspace PRIVATE HS_ANDROID=1 HS_APPLE_GAME=1 HS_IPAD_LINUX=1)
++        if(HS_IPAD_SWITCH)
++            target_compile_definitions(Hyperspace PRIVATE HS_ANDROID=1 HS_APPLE_GAME=1 HS_IPAD_SWITCH=1)
++        else()
++            target_compile_definitions(Hyperspace PRIVATE HS_ANDROID=1 HS_APPLE_GAME=1 HS_IPAD_LINUX=1)
++        endif()
+     endif()
+     target_link_options(Hyperspace PRIVATE
+         # The port's libunwind, which can also walk the game's Mach-O frames
+diff --git a/libzhlgen/lua/parsefuncs.lua b/libzhlgen/lua/parsefuncs.lua
+index e156fdf..daaacc6 100644
+--- a/libzhlgen/lua/parsefuncs.lua
++++ b/libzhlgen/lua/parsefuncs.lua
+@@ -1301,7 +1301,7 @@ local function writeFunctionWrappers(funcs, out)
+ 
+ #ifdef _WIN32
+     #define FUNC_NAKED __declspec(naked)
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(HS_IPAD_SWITCH)
+     #if __clang__
+     #elif __GNUC__ < 8
+         #error "GCC version too old, must be at least version 8"
+@@ -1784,7 +1784,7 @@ f([[#pragma once
+     #define LIBZHL_INTERFACE __declspec(novtable)
+     __declspec(noreturn) inline void __cdecl __NOP() {}
+     #define LIBZHL_PLACEHOLDER {__NOP();}
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(HS_IPAD_SWITCH)
+     #define LIBZHL_INTERFACE
+     #define LIBZHL_PLACEHOLDER {\
+         _Pragma("GCC diagnostic push") \
+diff --git a/src/HSVersion.h b/src/HSVersion.h
+index d988605..58eba74 100644
+--- a/src/HSVersion.h
++++ b/src/HSVersion.h
+@@ -16,7 +16,9 @@ Change the version numbers here
+ #include <boost/algorithm/string.hpp>
+ #include <boost/format.hpp>
+ 
+-#ifdef HS_IPAD_LINUX
++#ifdef HS_IPAD_SWITCH
++    #define BUILD_TGT " Switch"
++#elif defined(HS_IPAD_LINUX)
+     #define BUILD_TGT " ARM Linux"
+ #elif defined(__ANDROID__)
+     #define BUILD_TGT " Android"
+diff --git a/src/android/AndroidHost.cpp b/src/android/AndroidHost.cpp
+index 9c17651..00bc920 100644
+--- a/src/android/AndroidHost.cpp
++++ b/src/android/AndroidHost.cpp
+@@ -13,9 +13,12 @@
+ #include <android/log.h>
+ #include <sys/system_properties.h>
+ #endif
++#ifndef HS_IPAD_SWITCH  // the Switch port links Hyperspace in: no dynamic loader
+ #include <dlfcn.h>
+ #include <elf.h>
+ #include <link.h>
++#endif
++#include <stddef.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <string.h>
+@@ -27,6 +30,7 @@ static hs_host_info g_host;
+ static std::string g_logDir;
+ static std::string g_zhlLogPath;
+ static std::string g_lastError;
++static bool g_running;  // hooks in place: errors go to the host's show_error from now on
+ 
+ static void HostLog(int level, const char *fmt, ...)
+ {
+@@ -49,6 +53,8 @@ void PAL_AndroidShowError(const char *title, const char *message)
+ {
+     HostLog(2, "Hyperspace: %s: %s", title, message);
+     g_lastError = std::string(title) + ": " + message;
++    if (g_running && g_host.show_error)
++        g_host.show_error(title, message);
+ }
+ 
+ std::string HS_LogPath(const char *name)
+@@ -66,9 +72,15 @@ static void LogCallers()
+     {
+         uintptr_t ret = fp[1];
+         if (!ret) break;
++#ifndef HS_IPAD_SWITCH
+         Dl_info di = {};
++#endif
+         if (game && ret >= game && ret < game + g_host.image_size)
+             HostLog(2, "  from FTL %#lx", (unsigned long)(ret - g_host.slide));
++#ifdef HS_IPAD_SWITCH
++        else
++            HostLog(2, "  from %#lx", (unsigned long)ret);  // ftl.elf: llvm-symbolizer with its load address
++#else
+         else if (!dladdr((void *)ret, &di) || !di.dli_fname)
+             HostLog(2, "  from %#lx", (unsigned long)ret);
+         else if (di.dli_sname)
+@@ -76,6 +88,7 @@ static void LogCallers()
+         else
+             HostLog(2, "  from %s+%#lx", strrchr(di.dli_fname, '/') ? strrchr(di.dli_fname, '/') + 1 : di.dli_fname,
+                     (unsigned long)(ret - (uintptr_t)di.dli_fbase));
++#endif
+         uintptr_t *next = (uintptr_t *)fp[0];
+         if (next <= fp) break;
+         fp = next;
+@@ -99,12 +112,14 @@ static void *MakeMissingStub(const char *name)
+ 
+ // The port's libunwind build looks up the game's unwind info through this, so
+ // exceptions and backtraces can pass through game frames.
++#ifndef HS_IPAD_SWITCH  // linked into the port there: its own definition serves both
+ extern "C" int __ftl_find_macho_unwind(uintptr_t pc, uintptr_t *mh, uintptr_t *textLen, uintptr_t *cu, size_t *cuLen,
+                                        uintptr_t *eh, size_t *ehLen)
+ {
+     if (!g_host.find_macho_unwind) return 0;
+     return g_host.find_macho_unwind(pc, mh, textLen, cu, cuLen, eh, ehLen);
+ }
++#endif
+ 
+ #ifdef __ANDROID__
+ // On x86 devices and emulators that run ARM apps through a translator (a native bridge),
+@@ -167,13 +182,14 @@ static void AdjustForTranslator() {}  // native bridges are an Android thing
+ 
+ extern "C" __attribute__((visibility("default"))) int hs_android_init(const hs_host_info *info, char *error, size_t errorSize)
+ {
+-    if (!info || info->version != HS_HOST_VERSION || info->size < sizeof(hs_host_info))
++    if (!info || info->version != HS_HOST_VERSION || info->size < HS_HOST_INFO_SIZE_V1)
+     {
+         snprintf(error, errorSize, "This Hyperspace build doesn't match the app (interface %u, expected %u).",
+                  info ? info->version : 0u, (unsigned)HS_HOST_VERSION);
+         return 1;
+     }
+-    g_host = *info;
++    g_host = hs_host_info{};
++    memcpy(&g_host, info, info->size < sizeof(g_host) ? info->size : sizeof(g_host));
+     g_logDir = info->log_dir ? info->log_dir : "";
+ 
+     // Files Hyperspace keeps in the game folder on PC (settings_hs.ini)
+@@ -194,6 +210,15 @@ extern "C" __attribute__((visibility("default"))) int hs_android_init(const hs_h
+     }
+     AdjustForTranslator();
+     Arm64Detour::SetGameRange((uintptr_t)info->mach_header, info->image_size);
++    if (g_host.alloc_code && g_host.write_code)
++        Arm64Detour::SetHostCode(g_host.alloc_code, g_host.write_code);
++#ifdef HS_IPAD_SWITCH
++    else
++    {
++        snprintf(error, errorSize, "The app gives Hyperspace no code memory.");
++        return 1;
++    }
++#endif
+     ZHL::SetMissingFunctionStub(MakeMissingStub);
+ 
+     if (!ZHL::Init())
+@@ -203,6 +228,7 @@ extern "C" __attribute__((visibility("default"))) int hs_android_init(const hs_h
+     }
+     size_t poolSize = 0, poolUsed = Arm64Detour::PoolUsed(&poolSize);
+     HostLog(0, "Hyperspace: hooks installed (%zuK of %zuK for trampolines)", poolUsed >> 10, poolSize >> 10);
++    g_running = true;
+ 
+     G_->Initialize();
+     HostLog(0, "Hyperspace: initialized");
+diff --git a/src/android/HyperspaceHost.h b/src/android/HyperspaceHost.h
+index 45ef4c9..8e2797a 100644
+--- a/src/android/HyperspaceHost.h
++++ b/src/android/HyperspaceHost.h
+@@ -39,8 +39,25 @@ typedef struct hs_host_info
+        sides are built with. Returns 0 when pc is not in the game. */
+     int (*find_macho_unwind)(uintptr_t pc, uintptr_t *mh, uintptr_t *text_len, uintptr_t *compact_unwind,
+                              size_t *compact_unwind_len, uintptr_t *eh_frame, size_t *eh_frame_len);
++
++    /* Optional (hosts may pass a smaller size without them): where code memory comes
++       from on hosts that can't map or reprotect it themselves (the Switch). alloc_code
++       returns size bytes of executable memory within +-128MB of the game, and
++       write_code writes n bytes of code at dst (game or alloc_code memory) and makes
++       them visible to instruction fetch, returning 0 on success. */
++    void *(*alloc_code)(size_t size);
++    int (*write_code)(void *dst, const void *src, size_t n);
++
++    /* Optional: shows an error the way the PC builds show a message box (a mod's
++       Hyperspace.ErrorMessage from Lua, a broken hyperspace.xml) and returns once the
++       player closed it, the game waiting meanwhile as on PC. Called on the game's
++       thread once Hyperspace is running; without it, errors only go to the log. */
++    void (*show_error)(const char *title, const char *message);
+ } hs_host_info;
+ 
++/* The size of the interface before the optional fields */
++#define HS_HOST_INFO_SIZE_V1 offsetof(hs_host_info, alloc_code)
++
+ /* Returns 0 once Hyperspace's hooks are in place. Otherwise writes the reason to
+    error and returns nonzero; the game must not be started then, since some hooks may
+    already be installed. */
+diff --git a/src/helpers/palWindowsGeneric.h b/src/helpers/palWindowsGeneric.h
+index 6cc87cd..db91e7f 100644
+--- a/src/helpers/palWindowsGeneric.h
++++ b/src/helpers/palWindowsGeneric.h
+@@ -5,7 +5,7 @@
+ #ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(HS_IPAD_SWITCH)
+ #else
+ #error Unknown Platform
+ #endif
+diff --git a/src/zhl/Arm64Detour.cpp b/src/zhl/Arm64Detour.cpp
+index d6be2cc..72f1300 100644
+--- a/src/zhl/Arm64Detour.cpp
++++ b/src/zhl/Arm64Detour.cpp
+@@ -8,7 +8,14 @@
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
+-#include <sys/mman.h>
++#ifndef HS_IPAD_SWITCH
++    #include <sys/mman.h>
++#else
++    // No mmap/mprotect on Horizon: code memory always comes from the host (SetHostCode)
++    #define PROT_READ 1
++    #define PROT_WRITE 2
++    #define PROT_EXEC 4
++#endif
+ #include <unistd.h>
+ #include <mutex>
+ #include <vector>
+@@ -47,6 +54,9 @@ namespace
+     Pool g_pool;
+     std::mutex g_lock;
+ 
++    void *(*g_hostAlloc)(size_t) = nullptr;
++    int (*g_hostWrite)(void *, const void *, size_t) = nullptr;
++
+     bool NearEnough(uintptr_t from, uintptr_t to)
+     {
+         intptr_t d = (intptr_t)to - (intptr_t)from;
+@@ -62,7 +72,9 @@ namespace
+ 
+     bool TakePool(Pool &pool, void *p, size_t size)
+     {
+-        mprotect(p, size, PROT_READ | PROT_EXEC);
++#ifndef HS_IPAD_SWITCH
++        if (!g_hostAlloc) mprotect(p, size, PROT_READ | PROT_EXEC);
++#endif
+         pool.base = (uint8_t *)p;
+         pool.size = size;
+         pool.used = 0;
+@@ -74,6 +86,9 @@ namespace
+     // fixed steps can miss the gaps between them. The one nearest the game wins.
+     bool MakePoolInGap(Pool &pool, uintptr_t lo, uintptr_t hi, size_t size)
+     {
++#ifdef HS_IPAD_SWITCH
++        return false;
++#endif
+         FILE *f = fopen("/proc/self/maps", "r");
+         if (!f) return false;
+         std::vector<std::pair<uintptr_t, uintptr_t>> used;
+@@ -109,6 +124,7 @@ namespace
+             uintptr_t dx = x > mid ? x - mid : mid - x, dy = y > mid ? y - mid : mid - y;
+             return dx < dy;
+         });
++#ifndef HS_IPAD_SWITCH
+         for (uintptr_t want : candidates)
+         {
+             void *p = mmap((void *)want, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+@@ -120,11 +136,20 @@ namespace
+             }
+             return TakePool(pool, p, size);
+         }
++#endif
+         return false;
+     }
+ 
+     bool MakePoolNear(Pool &pool, uintptr_t lo, uintptr_t hi, size_t size)
+     {
++        if (g_hostAlloc)
++        {
++            void *p = g_hostAlloc(size);
++            return p && PoolInReach((uintptr_t)p, size, lo, hi) && TakePool(pool, p, size);
++        }
++#ifdef HS_IPAD_SWITCH
++        return false;
++#endif
+         if (MakePoolInGap(pool, lo, hi, size)) return true;
+ 
+         const uintptr_t align = 1u << 16;
+@@ -138,6 +163,7 @@ namespace
+                                           : (lo & ~(align - 1)) - size - step;
+                 // NOREPLACE fails rather than map over something; kernels too old to know
+                 // it treat the address as a hint, which the range check below covers
++#ifndef HS_IPAD_SWITCH
+                 void *p = mmap((void *)want, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
+                 if (p == MAP_FAILED) continue;
+                 if (!PoolInReach((uintptr_t)p, size, lo, hi))
+@@ -146,6 +172,7 @@ namespace
+                     continue;
+                 }
+                 return TakePool(pool, p, size);
++#endif
+             }
+         }
+         return false;
+@@ -165,9 +192,14 @@ namespace
+ 
+     bool SetProt(void *addr, size_t size, int prot)
+     {
++#ifdef HS_IPAD_SWITCH
++        return false;
++#endif
+         uintptr_t start = (uintptr_t)addr & ~(uintptr_t)(PageSize() - 1);
+         uintptr_t end = ((uintptr_t)addr + size + PageSize() - 1) & ~(uintptr_t)(PageSize() - 1);
++#ifndef HS_IPAD_SWITCH
+         return mprotect((void *)start, end - start, prot) == 0;
++#endif
+     }
+ 
+     // Protection of memory that is neither the game's nor the pool's, from /proc/self/maps
+@@ -212,8 +244,9 @@ namespace
+ 
+     // Executable pages stay executable while they're written: another thread (audio)
+     // may be running code on the same page.
+-    bool WriteCode(void *dst, const void *src, size_t n, int prot)
++    bool RawWriteCode(void *dst, const void *src, size_t n, int prot)
+     {
++        if (g_hostWrite) return g_hostWrite(dst, src, n) == 0;
+         if (!SetProt(dst, n, prot | PROT_READ | PROT_WRITE)) return false;
+         memcpy(dst, src, n);
+         bool ok = SetProt(dst, n, prot);
+@@ -221,9 +254,9 @@ namespace
+         return ok;
+     }
+ 
+-    bool WriteCode(void *dst, const void *src, size_t n)
++    bool RawWriteCode(void *dst, const void *src, size_t n)
+     {
+-        return WriteCode(dst, src, n, CurrentProt(dst));
++        return RawWriteCode(dst, src, n, CurrentProt(dst));
+     }
+ 
+     // ---- code generation --------------------------------------------------------------
+@@ -371,7 +404,7 @@ namespace
+         uint8_t *p = PoolAlloc(e.Size(), pool);
+         if (!p) return nullptr;
+         size_t n = e.Finish(tmp);
+-        return WriteCode(p, tmp, n) ? p : nullptr;
++        return RawWriteCode(p, tmp, n) ? p : nullptr;
+     }
+ 
+     uint32_t BranchTo(uintptr_t from, uintptr_t to)
+@@ -382,6 +415,18 @@ namespace
+ 
+ namespace Arm64Detour
+ {
++    void SetHostCode(void *(*alloc)(size_t size), int (*write)(void *dst, const void *src, size_t n))
++    {
++        g_hostAlloc = alloc;
++        g_hostWrite = write;
++    }
++
++    bool WriteCode(void *dst, const void *src, size_t n)
++    {
++        std::lock_guard<std::mutex> lock(g_lock);
++        return RawWriteCode(dst, src, n);
++    }
++
+     void SetGameRange(uintptr_t start, size_t size)
+     {
+         g_gameStart = start;
+@@ -446,7 +491,7 @@ namespace Arm64Detour
+         }
+         int64_t d = ((int64_t)(uintptr_t)veneer - (int64_t)t) >> 2;
+         uint32_t b = 0x14000000u | (uint32_t)(d & 0x3ffffff);
+-        if (!WriteCode(target, &b, 4))
++        if (!RawWriteCode(target, &b, 4))
+         {
+             snprintf(error, errorSize, "could not make game code writable");
+             return nullptr;
+@@ -503,7 +548,7 @@ namespace Arm64Detour
+             uint32_t b = BranchTo(a, (uintptr_t)stub);
+             // Both are read+execute; /proc/self/maps can't say so under a translator, which
+             // maps ARM code for itself to read, not to run
+-            if (!WriteCode(stub, tmp, n, PROT_READ | PROT_EXEC) || !WriteCode((void *)a, &b, 4, PROT_READ | PROT_EXEC))
++            if (!RawWriteCode(stub, tmp, n, PROT_READ | PROT_EXEC) || !RawWriteCode((void *)a, &b, 4, PROT_READ | PROT_EXEC))
+             {
+                 snprintf(error, errorSize, "could not write code");
+                 return -1;
+@@ -513,14 +558,18 @@ namespace Arm64Detour
+         return count;
+     }
+ 
++    // With host code memory (the Switch) the game's data, read-only data included,
++    // stays writable; code is only ever written through WriteCode.
+     bool Unprotect(void *address, size_t size, int *oldProt)
+     {
++        if (g_hostWrite) { *oldProt = 0; return true; }
+         *oldProt = CurrentProt(address);
+         return SetProt(address, size, *oldProt | PROT_READ | PROT_WRITE);
+     }
+ 
+     bool Reprotect(void *address, size_t size, int oldProt)
+     {
++        if (g_hostWrite) return true;
+         bool ok = SetProt(address, size, oldProt);
+         if (oldProt & PROT_EXEC) FlushCode(address, size);
+         return ok;
+diff --git a/src/zhl/Arm64Detour.h b/src/zhl/Arm64Detour.h
+index ddf35b7..3c95f2f 100644
+--- a/src/zhl/Arm64Detour.h
++++ b/src/zhl/Arm64Detour.h
+@@ -46,6 +46,11 @@ namespace Arm64Detour
+ 
+     // Make memory writable for a moment (code or data) and restore it afterwards,
+     // flushing the instruction cache when the range is executable.
++    // Code memory from the host instead of mmap/mprotect (the Switch: code is never
++    // made writable; the host writes it through a second, writable view)
++    void SetHostCode(void *(*alloc)(size_t size), int (*write)(void *dst, const void *src, size_t n));
++    // Writes code (game or trampolines) and flushes it
++    bool WriteCode(void *dst, const void *src, size_t n);
+     bool Unprotect(void *address, size_t size, int *oldProt);
+     bool Reprotect(void *address, size_t size, int oldProt);
+ }
+diff --git a/src/zhl/zhl.cpp b/src/zhl/zhl.cpp
+index 6fa5f4e..3c5c1fc 100644
+--- a/src/zhl/zhl.cpp
++++ b/src/zhl/zhl.cpp
+@@ -19,7 +19,7 @@
+ 
+ #ifdef _WIN32
+     #define OUR_OWN_FUNCTIONS_CALLEE_DOES_CLEANUP 1
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(HS_IPAD_SWITCH)
+     #define OUR_OWN_FUNCTIONS_CALLEE_DOES_CLEANUP 0
+     #define USE_STACK_ALIGNMENT
+     #define STACK_ALIGNMENT_SIZE 0x10
+diff --git a/src/zhl/zhl.h b/src/zhl/zhl.h
+index 71a686b..5ce97eb 100644
+--- a/src/zhl/zhl.h
++++ b/src/zhl/zhl.h
+@@ -13,7 +13,7 @@
+         #undef JUMP_INSTRUCTION
+         #define JUMP_INSTRUCTION "jmp %0"
+     #endif // MSVC
+-#elif defined(__linux__) || defined(__APPLE__)
++#elif defined(__linux__) || defined(__APPLE__) || defined(HS_IPAD_SWITCH)
+     // Linux exports all symbols, we don't need to be specific like in Windows.
+     // If we want to optimize this library in the future we'd need to change things around to an EXPORTED & NON_EXPORTED definition and set the __attribute___((visibility( thing to explicitly hide some exports on *NIX systems
+     // SEE: https://gcc.gnu.org/wiki/Visibility
+diff --git a/src/zhl/zhl_definitions.cpp b/src/zhl/zhl_definitions.cpp
+index 6ed5c0e..92f65b6 100644
+--- a/src/zhl/zhl_definitions.cpp
++++ b/src/zhl/zhl_definitions.cpp
+@@ -251,7 +251,7 @@ int NoOpDefinition::Load()
+     for(unsigned int i = 0; i + 4 <= (unsigned int)m.length; i += 4)
+     {
+         const uint32_t nop = 0xd503201f;
+-        memcpy((void*)(ptrToCode + i), &nop, 4);
++        Arm64Detour::WriteCode((void*)(ptrToCode + i), &nop, 4);  // through the host where code isn't writable
+     }
+     MEMPROT_REPROTECT(ptrToCode, noopingSize, dwOldProtect);
+ #else

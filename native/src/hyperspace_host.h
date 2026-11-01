@@ -35,7 +35,24 @@ typedef struct hs_host_info
        sides are built with. Returns 0 when pc is not in the game. */
     int (*find_macho_unwind)(uintptr_t pc, uintptr_t *mh, uintptr_t *text_len, uintptr_t *compact_unwind,
                              size_t *compact_unwind_len, uintptr_t *eh_frame, size_t *eh_frame_len);
+
+    /* Optional (hosts may pass a smaller size without them): where code memory comes
+       from on hosts that can't map or reprotect it themselves (the Switch). alloc_code
+       returns size bytes of executable memory within +-128MB of the game, and
+       write_code writes n bytes of code at dst (game or alloc_code memory) and makes
+       them visible to instruction fetch, returning 0 on success. */
+    void *(*alloc_code)(size_t size);
+    int (*write_code)(void *dst, const void *src, size_t n);
+
+    /* Optional: shows an error the way the PC builds show a message box (a mod's
+       Hyperspace.ErrorMessage from Lua, a broken hyperspace.xml) and returns once the
+       player closed it, the game waiting meanwhile as on PC. Called on the game's
+       thread once Hyperspace is running; without it, errors only go to the log. */
+    void (*show_error)(const char *title, const char *message);
 } hs_host_info;
+
+/* The size of the interface before the optional fields */
+#define HS_HOST_INFO_SIZE_V1 offsetof(hs_host_info, alloc_code)
 
 /* Returns 0 once Hyperspace's hooks are in place. Otherwise writes the reason to
    error and returns nonzero; the game must not be started then, since some hooks may
