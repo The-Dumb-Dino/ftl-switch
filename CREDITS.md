@@ -11,10 +11,12 @@ endorsed by Subset Games, Apple or Nintendo.
 
 This project is based on [ftl-android](https://github.com/Sidd065/ftl-android)
 by **Sidd065**, which runs FTL for iPad on Android. It started as a fork of
-ftl-android 0.4.3 (commit `55ee45d`); the git history keeps every upstream
-commit with its author.
+ftl-android 0.4.3 (commit `55ee45d`) and has been reworked extensively since:
+all of its Android code (the Android app, its Java/JNI layer, the Android
+platform code and build) was removed, and what remains was adapted to new
+platforms. The git history keeps every upstream commit with its author.
 
-From ftl-android, largely as it was there:
+From ftl-android, adapted for this project:
 
 - the Mach-O loader (`native/src/loader/`)
 - the Objective-C runtime with Apple's ABI (`native/src/objc/`)
@@ -52,7 +54,7 @@ New or changed in this project:
 
 | Component | Used for | License |
 |---|---|---|
-| [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace), Linux and Switch targets in [FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino) | Optional mod loader, built from source (`hyperspace/source.sh`) | GPL-3.0-or-later |
+| [Hyperspace](https://github.com/FTL-Hyperspace/FTL-Hyperspace), iPad fork by [Sidd065](https://github.com/Sidd065/FTL-Hyperspace); built from the [`iOS-binary-ports`](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino/tree/iOS-binary-ports) branch of [FTL-Hyperspace-Dino](https://github.com/The-Dumb-Dino/FTL-Hyperspace-Dino), which adds the Linux and Switch targets | Optional mod loader, built from source (`hyperspace/source.sh`) | GPL-3.0 |
 | [ftlman](https://github.com/afishhh/ftlman) by afishhh | Linux: the mod manager, run as its own program. Switch: its patch engine, linked into `ftl.nro` | GPL-2.0 (`ftlman/LICENSE`); see the note below |
 | [LLVM](https://llvm.org/) libc++, libc++abi, libunwind 19.1.7 | The game's C++ runtime, patched (`libcxx/`) and linked in | Apache-2.0 WITH LLVM-exception |
 | [stb_image](https://github.com/nothings/stb) by Sean Barrett | PNG decoding (`native/src/third_party/`) | MIT or public domain |
@@ -79,16 +81,14 @@ Foundation, version 3 (see [LICENSE](LICENSE)).
 Since the ftl-android parts don't carry "or later", the project as a whole is
 distributed under version 3 of the GPL.
 
-**A note on ftlman in `ftl.nro`.** ftlman ships the text of the GPL version 2
-and doesn't say "or later". On Linux it runs as a separate program, so that
-doesn't matter. On the Switch its engine is linked into the same executable as
-GPL-3.0 code (this project and Hyperspace), and GPL-2.0-only and GPL-3.0 code
-can't be combined in one program. Before distributing an `ftl.nro` built with
-ftlman (`switch/rust/build-ftlman.sh`), this needs ftlman's author to confirm
-"version 2 or later", or ftlman needs to become a separate program; `FTLMAN=
-switch/build.sh` builds `ftl.nro` without it (mods are then patched on a PC).
-This repository itself only holds patches and build scripts for ftlman, not its
-code.
+**ftlman in `ftl.nro`.** ftlman ships the text of the GPL version 2. On Linux
+it runs as a separate program; on the Switch its patch engine is linked into
+`ftl.nro` together with GPL-3.0 code (this project and Hyperspace), which
+needs ftlman under GPL version 2 "or later". It is used here on the
+understanding that its author, afishhh, agrees; his written confirmation is
+still pending. If that changes, `FTLMAN= switch/build.sh` builds `ftl.nro`
+without it (mods are then patched on a PC). This repository itself only holds
+patches and build scripts for ftlman, not its code.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A

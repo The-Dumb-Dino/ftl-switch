@@ -17,10 +17,11 @@ and Joy-Cons, mods applied on the console, Hyperspace, and Multiverse with The
 Renegade Collection.
 
 This project is based on [ftl-android](https://github.com/Sidd065/ftl-android)
-by Sidd065, whose loader, Objective-C runtime and iOS frameworks it runs on;
-see [CREDITS.md](CREDITS.md) for what came from there and what's new. The same
-code also builds the Linux desktop version, `ftl-linux`, whose own repository
-is **ftl-linux**.
+by Sidd065, whose loader, Objective-C runtime and iOS frameworks it runs on.
+It has been reworked extensively and none of ftl-android's Android code is
+left; see [CREDITS.md](CREDITS.md) for what came from there and what's
+new. The same code also builds the Linux desktop version, `ftl-linux`, whose
+own repository is **ftl-linux**.
 
 ## Quick start
 
@@ -55,8 +56,8 @@ was started (Homebrew Menu over a game, or a forwarder).
 GNU General Public License, version 3 ([LICENSE](LICENSE)). The code from
 ftl-android is GPL version 3; what this project adds is also available under
 GPL version 3 or any later version. Details, the licenses of Hyperspace, ftlman
-and the other components, and **a licensing note about building ftlman into
-`ftl.nro`**: [CREDITS.md](CREDITS.md).
+and the other components, and a note on ftlman in `ftl.nro`:
+[CREDITS.md](CREDITS.md).
 
 FTL: Faster Than Light is made by Subset Games. This project isn't affiliated
 with or endorsed by Subset Games, Apple or Nintendo.
