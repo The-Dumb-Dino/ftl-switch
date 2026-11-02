@@ -40,6 +40,7 @@ native/src/
     execmem_switch.c  code memory under Horizon
     mods_switch.c     mods from /switch/ftl/mods/, applied with ftlman's engine;
                       the mod list
+    settings_menu_switch.c  the settings menu (settings.ini on the console)
     update_switch.c   the updater (release builds)
     log_switch.c      session logs and the kernel's debug output
     memdiag_switch.c  memory reports when the heap runs out
@@ -71,9 +72,15 @@ native/src/
   running one as `ftl.nro.new`, checks size, SHA-256 and the NRO header, swaps
   the files (the old one back if that fails) and starts the new one with
   `envSetNextLoad`.
-- With mods in `mods/` it waits 1.5 s at the mods step for L, which opens the
-  mod list (`switch_mods_menu` in `mods_switch.c`) on that console. It's a
-  press, not a hold: a button held while an app starts isn't reported to it.
+- Then it waits 1.5 s for L, which opens the mod list (`switch_mods_menu` in
+  `mods_switch.c`), or R, which opens the settings menu
+  (`settings_menu_switch.c`), on that console. It's a press, not a hold: a
+  button held while an app starts isn't reported to it. The settings menu
+  rewrites only the changed values in `settings.ini` and keeps its comments
+  (`settings_save` in `settings.c`).
+- With `hide_start_screen = true` the console only comes up when there's
+  something to show (mods being applied, an update, an error, the menus); when
+  it doesn't, the game starts in the same run, without the restart below.
 - Once the console has been used, the graphics can't get a clean window in the
   same run, so `ftl.nro` asks the Homebrew Menu to start it again with
   `--quiet` (`envSetNextLoad`), which goes straight into the game.

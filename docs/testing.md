@@ -4,7 +4,8 @@
 
 - Session logs go to `sdmc:/switch/ftl/logs/`; the last five sessions are kept,
   and Hyperspace's `zhl.log` and `FTL_HS.log` go to the same folder.
-  `verbose = true` in `settings.ini` logs more.
+  **Detailed logs** in the settings menu (`verbose = true` in `settings.ini`)
+  logs more.
 - On a crash the log ends with a backtrace: the game's frames as `FTL+<address>`
   (the address in the 1.6.21 binary, as a disassembler shows it), the port's as
   offsets into `ftl.elf`.

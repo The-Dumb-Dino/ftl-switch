@@ -6,7 +6,8 @@ This runs the real iOS game, unmodified: a Mach-O loader, an Objective-C runtime
 and just enough of the iOS frameworks underneath it, on top of libnx. The
 touchscreen works as on the iPad, Joy-Cons and the Pro Controller drive a
 cursor, mods are applied on the console with ftlman's engine, and Hyperspace
-(Multiverse and other big mods) is built in.
+(Multiverse and other big mods) is built in. A mod list and a settings menu on
+the console (L and R while FTL starts) mean no PC is needed after the setup.
 
 **Nothing of the game is in this repository**: You are required to acquire your own `FTL.ipa` to put on the
 SD card.
@@ -37,7 +38,8 @@ One of my fellow developer friends said something pretty fitting:
    tool like Sphaira). Without one, hold **R** while starting any game and pick
    FTL in the Homebrew Menu; from the Album (gallery) it doesn't work.
 3. The first start imports the game (a minute or so). Mods go in
-   `sdmc:/switch/ftl/mods/`.
+   `sdmc:/switch/ftl/mods/`. Press **L** while FTL starts for the mod list,
+   **R** for the settings.
 
 To build `ftl.nro` yourself, see [docs/switch/building.md](docs/switch/building.md).
 
@@ -57,7 +59,7 @@ just as valuable.
 
 | | |
 |---|---|
-| [Playing](docs/switch/playing.md) | Installing, controls, settings, logs, what was tested, known limitations |
+| [Playing](docs/switch/playing.md) | Installing, controls, the settings menu, logs, what was tested, known limitations |
 | [Mods and Hyperspace](docs/switch/mods.md) | Mods on the console, the mod list, very large mod sets on a PC, Hyperspace |
 | [Building](docs/switch/building.md) | Toolchain, build steps, the icon, testing in Ryujinx |
 | [How it works](docs/how-it-works.md) | The loader, the runtime and frameworks under the game, code memory under Horizon, the toolchain, ftlman and Hyperspace in one `.nro` |

@@ -10,5 +10,10 @@ void switch_show_error(const char *msg);  // the error applet, or the console be
 void port_log_flush(void);
 // Release builds (FTL_SWITCH_UPDATE_REPO): offers a newer GitHub release on the console
 // and installs it over itself (update_switch.c); then switch_update_installed() is its path
-void switch_update_check(const char *argv0);
+// show() puts the start screen up (hide_start_screen) before it asks anything.
+void switch_update_check(const char *argv0, void (*show)(void));
 const char *switch_update_installed(void);
+// The settings menu (R on the start screen, Y in the mod list): writes the changes
+// to settings.ini at path and uses them. Returns true when X (save and open the mod
+// list) left it.
+bool switch_settings_menu(const char *path, bool from_mods);

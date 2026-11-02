@@ -66,6 +66,7 @@ if(FTL_SWITCH_APP)
         src/platform/switch/log_switch.c
         src/platform/switch/compat_switch.c
         src/platform/switch/memdiag_switch.c
+        src/platform/switch/settings_menu_switch.c
         # shared code from the Linux version: settings.ini, the .ipa import, the mod image overlay
         src/platform/linux/settings.c
         src/platform/linux/import.c

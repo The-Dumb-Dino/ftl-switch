@@ -369,7 +369,7 @@ static bool g_restart;
 
 static bool is_nro(const char *p) { return p && strlen(p) > 4 && !strcasecmp(p + strlen(p) - 4, ".nro"); }
 
-void switch_update_check(const char *argv0) {
+void switch_update_check(const char *argv0, void (*show)(void)) {
     if (!setting_bool("check_updates", true)) return;
     // The loader passes the .nro's path; without it (emulators), the usual place
     const char *self = is_nro(argv0) ? argv0 : "sdmc:/switch/ftl/ftl.nro";
@@ -403,6 +403,7 @@ void switch_update_check(const char *argv0) {
     } else if (got < 0 && year) {
         // The one failure the player can fix: say so and give time to read it
         LOGW("update: no answer from GitHub (%s), the clock says %d", err, year);
+        show();
         printf("\nCouldn't look for updates: %s\n"
                "The Switch's clock says %d. Set the date and time in the\n"
                "System Settings, then GitHub's certificate checks out.\n"
@@ -422,6 +423,7 @@ void switch_update_check(const char *argv0) {
         printf("  %s is available (skipped; delete update-skip to be asked again)\n", r.tag);
     } else {
         LOGI("update: %s available (this is %s)", r.tag, FTL_SWITCH_VERSION);
+        show();
         printf("\n"
                "A new version of FTL for Switch is available: %s\n"
                "(this one is %s)\n"

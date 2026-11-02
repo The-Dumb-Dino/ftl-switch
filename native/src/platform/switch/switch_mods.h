@@ -24,6 +24,7 @@ int switch_mods_save(const switch_mod *mods, int n);
 int switch_mods_apply(const switch_mod *mods, int n, void (*print)(const char *line), char *err, int errlen);
 // Whether the mods that are on differ from what was applied last.
 bool switch_mods_changed(const switch_mod *mods, int n);
-// The mod list on the console: on/off, order, all off; saves mods/order.txt.
-// Returns whether anything changed (startup then applies it as usual).
+// The mod list on the console: on/off, order, all off; saves mods/order.txt and
+// applies it (X) or leaves that to startup (+); Y opens the settings. Returns
+// whether the list changed.
 bool switch_mods_menu(void);

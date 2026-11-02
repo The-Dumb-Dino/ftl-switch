@@ -28,7 +28,10 @@
 // start, with each step, so a start that stops somewhere shows where. So that the
 // GPU driver gets a window the console never touched, ftl.nro then has the Homebrew
 // loader start it again with --quiet, which goes straight to the game (where the
-// loader can't, as in emulators, it goes on from the console).
+// loader can't, as in emulators, it goes on from the console). With
+// hide_start_screen = true the console only comes up when there's something to
+// show (mods being applied, an update, an error, the menus), and when it doesn't,
+// the game starts right away without the restart.
 static bool g_console, g_console_used;
 
 static void console_on(void) {
@@ -39,32 +42,38 @@ static void console_on(void) {
     printf("\n");
 }
 
+// Offers the menus: waits a moment for L (the mod list) or R (settings). A button
+// held while the app starts isn't reported to it (the log shows what was), so
+// it's a press, not a hold. With the start screen hidden it waits all the same,
+// without saying so.
+static u64 menu_wanted(void) {
+    bool mods = false;
 #ifdef FTL_SWITCH_FTLMAN
-// Offers the mod list: waits a moment for L. A button held while the app starts
-// isn't reported to it (the log shows what was), so it's a press, not a hold.
-static bool mod_list_wanted(void) {
-    static switch_mod mods[SWITCH_MAX_MODS];
-    if (switch_mods_list(mods, SWITCH_MAX_MODS) == 0) return false;  // nothing to choose from
+    static switch_mod list[SWITCH_MAX_MODS];
+    mods = switch_mods_list(list, SWITCH_MAX_MODS) > 0;  // else nothing to choose from
+#endif
     PadState pad;
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
-    printf("Press L for the mod list...\n");
-    consoleUpdate(NULL);
+    if (g_console) {
+        printf(mods ? "Press L for the mod list, R for settings...\n" : "Press R for settings...\n");
+        consoleUpdate(NULL);
+    }
+    u64 want = HidNpadButton_R | (mods ? HidNpadButton_L : 0);
     u64 start = armGetSystemTick(), wait = armGetSystemTickFreq() * 3 / 2;  // 1.5 s
     u64 seen = 0;
     while (appletMainLoop() && armGetSystemTick() - start < wait) {
         padUpdate(&pad);
         u64 held = padGetButtons(&pad);
         seen |= held;
-        if (held & HidNpadButton_L) return true;
-        consoleUpdate(NULL);
+        if (held & want) return held & HidNpadButton_L ? HidNpadButton_L : HidNpadButton_R;
+        if (g_console) consoleUpdate(NULL);
         svcSleepThread(10000000);  // 10 ms
     }
-    LOGI("start: no L for the mod list (buttons seen: %#llx, controller %s)", (unsigned long long)seen,
+    LOGI("start: no menu wanted (buttons seen: %#llx, controller %s)", (unsigned long long)seen,
          padIsConnected(&pad) ? "connected" : "not connected");
-    return false;
+    return 0;
 }
-#endif
 // stdout/stderr once the console is closed: the kernel's debug output (shown by
 // debuggers and emulators), not the console, which they'd still point at otherwise.
 static ssize_t debug_write(struct _reent *r, void *fd, const char *ptr, size_t len) {
@@ -196,26 +205,25 @@ int main(int argc, char **argv) {
     bool quiet = false;
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "--quiet")) quiet = true;
-    if (!quiet) {
-        console_on();
-        consoleUpdate(NULL);
-    }
     paths_init();
-    step("Reading settings...");
     mkdirs(g_paths.data_dir);
     mkdirs(g_paths.config_dir);
     char settings[700];
     snprintf(settings, sizeof settings, "%s/settings.ini", g_paths.config_dir);
     settings_write_default(settings);
     settings_load(settings);
+    if (!quiet && !setting_bool("hide_start_screen", false)) {
+        console_on();
+        consoleUpdate(NULL);
+    }
     port_verbose = setting_bool("verbose", false);
     mkdirs(g_paths.state_dir);
     port_log_open(g_paths.state_dir);
-    printf("Log: %s\n", g_paths.state_dir);
+    if (g_console) printf("Log: %s\n", g_paths.state_dir);
 #ifdef FTL_SWITCH_UPDATE_REPO
-    // On the console only: a quiet start is the restart after it, already checked
+    // Not on the quiet start: that's the restart after this one, already checked
     if (!quiet) {
-        switch_update_check(argc > 0 ? argv[0] : NULL);
+        switch_update_check(argc > 0 ? argv[0] : NULL, console_on);
         const char *updated = switch_update_installed();
         if (updated && restart_updated(updated)) {
             console_off();
@@ -224,6 +232,18 @@ int main(int argc, char **argv) {
         }
     }
 #endif
+    // The menus come before anything that a setting decides (allow_applet_mode)
+    if (!quiet) {
+        u64 menu = menu_wanted();
+        if (menu) console_on();
+        bool to_mods = menu == HidNpadButton_R && switch_settings_menu(settings, false);
+#ifdef FTL_SWITCH_FTLMAN
+        if (menu == HidNpadButton_L || to_mods) switch_mods_menu();
+#else
+        (void)to_mods;
+#endif
+        port_verbose = setting_bool("verbose", false);
+    }
     step("Checking memory...");
     char crash_marker[700];
     snprintf(crash_marker, sizeof crash_marker, "%s/crashed", g_paths.state_dir);
@@ -243,7 +263,7 @@ int main(int argc, char **argv) {
     port_memory(&free_mb, &total_mb, &game_mb);
     const char *mode = at == AppletType_Application || at == AppletType_SystemApplication ? "application" : "applet";
     LOGI("ftl.nro %s, %s, %ld MB", FTL_SWITCH_VERSION, mode, total_mb);
-    printf("Running as %s, %ld MB of memory\n", mode, total_mb);
+    if (g_console) printf("Running as %s, %ld MB of memory\n", mode, total_mb);
     if (total_mb < 1000 && !setting_bool("allow_applet_mode", false))
         fail("FTL needs more memory than the Album gives homebrew.\n\n"
              "Start it with a game's memory instead: hold R while starting any game,\n"
@@ -267,7 +287,6 @@ int main(int argc, char **argv) {
 #ifdef FTL_SWITCH_FTLMAN
     // Mods in /switch/ftl/mods/ are applied here with ftlman when that set changed (mods_switch.c)
     int mods_switch_apply(void (*console_on)(void));
-    if (!quiet && mod_list_wanted()) switch_mods_menu();
     mods_switch_apply(console_on);
 #endif
     // A ftl.dat patched with ftlman works as on Linux: the image overlay is made here.
@@ -280,10 +299,14 @@ int main(int argc, char **argv) {
              "to the PC, patch it there with ftlman, and copy the result back\n"
              "as game/ftl.dat. Or import the .ipa again.");
     bool mods_changed = mods_take_changed();
-    // Hyperspace (linked in) when the applied mods include it, as on Linux
+    // Hyperspace (linked in) when the applied mods include it, as on Linux, unless
+    // settings.ini has hyperspace = false
     const char *hs = NULL;
 #ifdef FTL_SWITCH_HYPERSPACE
-    if (mods_hyperspace_applied()) hs = "linked in";
+    if (mods_hyperspace_applied()) {
+        if (setting_bool("hyperspace", true)) hs = "linked in";
+        else LOGW("ftl.dat has Hyperspace mods, but hyperspace = false: starting without Hyperspace");
+    }
 #else
     if (mods_hyperspace_applied()) LOGW("ftl.dat has Hyperspace mods, but this ftl.nro is built without Hyperspace");
 #endif

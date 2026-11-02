@@ -31,7 +31,9 @@ too little (FTL says so and stops). Two ways to start it:
 
 Each start shows a short text screen first (settings, the game, mods), then
 FTL restarts itself straight into the game. If a start stops on that screen,
-the last line says why.
+the last line says why. **Hide the start screen** in the settings goes straight
+into the game instead; the screen then only shows when there's something to
+see (mods being applied, an update, an error).
 
 ## Controls
 
@@ -50,10 +52,10 @@ game.
 | ZR | Right click (for mods that use one) |
 
 The controller controls may be reworked in a future version. The buttons can
-be changed in `settings.ini` (see below).
+be changed in the settings (see below).
 
-**Zoom (optional)** is off: the whole game fits the screen. To use it, set
-`zoom = true` in `settings.ini`. Then two fingers pinch and pan, the game zooms
+**Zoom (optional)** is off: the whole game fits the screen. To use it, turn
+on **Zoom** in the settings. Then two fingers pinch and pan, the game zooms
 in on the map and the upgrade screen, a minimap shows where you are, **L/R**
 zoom and **−** or the right stick resets the zoom.
 
@@ -65,9 +67,10 @@ be safe, go back to the title screen first.
 ## Mods
 
 Put mods in `sdmc:/switch/ftl/mods/` and start FTL: it applies them before the
-game starts. To switch mods on and off, press **L** when the start screen says
-"Press L for the mod list...". Everything about mods and Hyperspace (Multiverse
-and other big mods) is in [mods.md](mods.md).
+game starts. To switch mods on and off, press **L** while FTL starts (the
+start screen says "Press L for the mod list, R for settings..."). Everything
+about mods and Hyperspace (Multiverse and other big mods) is in
+[mods.md](mods.md).
 
 ## Updates
 
@@ -84,13 +87,24 @@ that version (delete `update-skip` to be asked again).
 
 The check needs the Switch's date and time to be right; with the clock far off
 it can't reach GitHub securely, and the start screen says so.
-`check_updates = false` in `settings.ini` turns the check off. Builds you make
+**Look for updates** in the settings turns the check off. Builds you make
 yourself don't check.
 
 ## Settings
 
-`sdmc:/switch/ftl/settings.ini` is created on the first start, with a comment
-on every line. Delete a line to get its default.
+Press **R** while FTL starts (keep pressing it until the menu opens, also with
+the start screen hidden), or **Y** in the mod list, for the settings menu:
+
+    Up/Down  choose            A, Left/Right  change     Y  default
+    +        save and start    B  start without saving
+
+**X** saves and opens the mod list. (From the mod list, + saves and B goes back
+to the list.)
+
+The settings are kept in `sdmc:/switch/ftl/settings.ini`, which is created on
+the first start with a comment on every line; it can also be edited on a PC.
+The menu writes only what you changed and keeps the comments. Delete a line to
+get its default.
 
 | Setting | Default | |
 |---|---|---|
@@ -104,6 +118,8 @@ on every line. Delete a line to get its default.
 | `pad_rumble` | `true` | Rumble |
 | `pad_<button>` | see above | `a b x y l r zl zr lstick rstick plus minus` |
 | `zoom` | `false` | Zoom (see Controls); with it on, `pinch_zoom`, `auto_zoom`, `event_zoom` and `minimap` pick its parts |
+| `hyperspace` | `true` | Start Hyperspace when the mods include it (off: mods made for it may not work) |
+| `hide_start_screen` | `false` | No text screen at start unless there's something to show |
 | `allow_applet_mode` | `false` | Start from the Album too (little memory: may crash) |
 | `check_updates` | `true` | Look for updates at start (release builds) |
 | `verbose` | `false` | More detail in the logs |

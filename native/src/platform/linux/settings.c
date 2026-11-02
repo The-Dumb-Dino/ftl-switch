@@ -168,6 +168,10 @@ static const char DEFAULT_SETTINGS[] =
     "# pick among them.\n"
     "zoom = false\n"
     "\n"
+    "hide_start_screen = false   # no text screen at start unless there's something to show\n"
+    "                            # (mods being applied, an update, an error)\n"
+    "hyperspace = true           # start Hyperspace when the mods include it (false: the game\n"
+    "                            # without it; mods made for Hyperspace may not work then)\n"
     "allow_applet_mode = false   # start from the Album too (little memory: may crash)\n"
     "check_updates = true        # release builds: offer new versions from GitHub at start\n"
     "verbose = false             # more detail in logs/\n";
@@ -179,4 +183,124 @@ void settings_write_default(const char *path) {
     if (!f) return;
     fputs(DEFAULT_SETTINGS, f);
     fclose(f);
+}
+
+// Sets key = val in the file, keeping the rest of it: the value on the key's line is
+// replaced (its comment stays), else a commented-out "# key = ..." line becomes the
+// setting, else it's added at the end.
+static int set_in(char **text, const char *key, const char *val) {
+    char *s = *text, *hit = NULL, *hit_end = NULL, *commented = NULL;
+    size_t kl = strlen(key);
+    for (char *line = s; *line; ) {
+        char *end = strchr(line, '\n');
+        if (!end) end = line + strlen(line);
+        char *p = line;
+        while (p < end && (*p == ' ' || *p == '\t')) p++;
+        bool hash = p < end && *p == '#';
+        char *k = p;
+        if (hash) {
+            k++;
+            while (k < end && *k == ' ') k++;
+        }
+        char *q = k + kl;
+        if (q <= end && !strncmp(k, key, kl)) {
+            while (q < end && (*q == ' ' || *q == '\t')) q++;
+            if (q < end && *q == '=') {
+                if (!hash) {
+                    // the value: up to the comment or the end of the line
+                    char *v = q + 1;
+                    while (v < end && (*v == ' ' || *v == '\t')) v++;
+                    char *ve = v;
+                    if (ve < end && *ve == '"') {
+                        char *c = memchr(ve + 1, '"', (size_t)(end - ve - 1));
+                        ve = c ? c + 1 : end;
+                    } else {
+                        while (ve < end && *ve != ' ' && *ve != '\t' && *ve != '#' && *ve != '\r') ve++;
+                    }
+                    hit = v;
+                    hit_end = ve;
+                } else if (!commented) {
+                    commented = line;
+                    hit_end = end;
+                }
+            }
+        }
+        if (hit) break;
+        line = *end ? end + 1 : end;
+    }
+    size_t n = strlen(s), vl = strlen(val);
+    char *out;
+    if (hit) {
+        // keep the comment where it was when the new value fits before it
+        size_t old = (size_t)(hit_end - hit), pad = 0;
+        char *after = hit_end;
+        if (vl < old) pad = old - vl;
+        else
+            while (vl > old && after[0] == ' ' && after[1] == ' ') after++, old++;
+        out = malloc(n + vl + pad + 1);
+        if (!out) return -1;
+        size_t pre = (size_t)(hit - s);
+        memcpy(out, s, pre);
+        memcpy(out + pre, val, vl);
+        memset(out + pre + vl, ' ', pad);
+        strcpy(out + pre + vl + pad, after);
+        // no spaces left at the end of the line
+        char *e = out + pre + vl + pad, *t = e;
+        while (*t == ' ') t++;
+        if (*t == '\n' || *t == 0) memmove(e, t, strlen(t) + 1);
+    } else if (commented) {
+        out = malloc(n + kl + vl + 8);
+        if (!out) return -1;
+        size_t pre = (size_t)(commented - s);
+        memcpy(out, s, pre);
+        sprintf(out + pre, "%s = %s%s", key, val, hit_end);
+    } else {
+        out = malloc(n + kl + vl + 8);
+        if (!out) return -1;
+        sprintf(out, "%s%s%s = %s\n", s, n && s[n - 1] != '\n' ? "\n" : "", key, val);
+    }
+    free(s);
+    *text = out;
+    return 0;
+}
+
+int settings_save(const char *path, const char *const *keys, const char *const *vals, int n) {
+    char *text = NULL;
+    size_t len = 0;
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        text = malloc(sz > 0 ? (size_t)sz + 1 : 1);
+        if (text) len = sz > 0 ? fread(text, 1, (size_t)sz, f) : 0;
+        fclose(f);
+    } else {
+        text = strdup(DEFAULT_SETTINGS);
+        if (text) len = strlen(text);
+    }
+    if (!text) return -1;
+    text[len] = 0;
+    for (int i = 0; i < n; i++)
+        if (set_in(&text, keys[i], vals[i]) != 0) {
+            free(text);
+            return -1;
+        }
+    char tmp[1100];
+    snprintf(tmp, sizeof tmp, "%s.new", path);
+    f = fopen(tmp, "wb");
+    if (!f) {
+        free(text);
+        return -1;
+    }
+    size_t tl = strlen(text);
+    bool ok = fwrite(text, 1, tl, f) == tl;
+    ok = fclose(f) == 0 && ok;
+    free(text);
+    if (!ok || replace_file(tmp, path) != 0) {
+        remove(tmp);
+        return -1;
+    }
+    for (int i = 0; i < n; i++) settings_override(keys[i], vals[i]);
+    return 0;
 }

@@ -31,6 +31,9 @@ bool setting_bool(const char *key, bool def);
 int setting_tristate(const char *key);
 void settings_write_default(const char *path);  // when there is none yet
 void settings_override(const char *key, const char *val);  // for this run (command line)
+// Writes these settings into the file (keeping its comments and other lines) and
+// uses them from now on. 0 on success.
+int settings_save(const char *path, const char *const *keys, const char *const *vals, int n);
 
 // ---- import ----
 // Copies FTL, ftl.dat and Info.plist out of an .ipa/.zip, an FTL.app folder or

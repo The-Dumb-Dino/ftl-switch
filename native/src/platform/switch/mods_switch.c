@@ -157,10 +157,23 @@ static const char *dat_line(const char *sig) {
     return p ? p + 1 : sig + strlen(sig);
 }
 
+// Whether ftl.dat, replaced from outside, is the original game's again: the copy
+// kept before patching is gone (renamed back to ftl.dat), or ftl.dat has its size
+// (any mod changes the size).
+static bool dat_is_original(void) {
+    char van[700], dat[700];
+    snprintf(van, sizeof van, "%s/ftl.dat.vanilla", g_paths.game_dir);
+    snprintf(dat, sizeof dat, "%s/ftl.dat", g_paths.game_dir);
+    struct stat v, d;
+    if (stat(dat, &d) != 0) return false;
+    return stat(van, &v) != 0 || v.st_size == d.st_size;
+}
+
 // Only mods/ decides: a different set of mods there is applied (or, with none left
 // that were applied here, the original put back). An ftl.dat replaced from outside
 // (big mods like Multiverse patched with ftlman on a PC, which is much faster) is
-// used as it is, Hyperspace included when it has it (mods_linux.c looks inside).
+// used as it is, Hyperspace included when it has it (mods_linux.c looks inside),
+// unless it's the original game's again.
 bool switch_mods_changed(const switch_mod *mods, int n) {
     char sp[700];
     stamp_path(sp, sizeof sp);
@@ -175,9 +188,10 @@ bool switch_mods_changed(const switch_mod *mods, int n) {
         bool same_mods = (size_t)(dl - last) == (size_t)(dn - now) && !strncmp(last, now, (size_t)(dn - now));
         bool same_dat = !strcmp(dl, dn);
         bool had_mods = dl != last;
-        if (same_mods) changed = false;
+        if (same_mods) changed = on && !same_dat && dat_is_original();
         else if (on) changed = true;
         else changed = had_mods && same_dat;  // all taken off: the original back, unless ftl.dat was replaced
+        if (changed && same_mods) LOGI("mods: ftl.dat is the original again: applying the mods again");
         if (!changed && !same_dat) LOGI("mods: ftl.dat was replaced (patched on a PC?): starting with it as it is");
         if (!changed) write_text(sp, now);
     }
@@ -279,7 +293,7 @@ int switch_mods_apply(const switch_mod *mods, int n, void (*print)(const char *l
 
 #define MENU_ROWS 30  // mods shown at once; libnx's console is 80x45
 
-static void menu_draw(const switch_mod *mods, int n, int sel, int top, const char *note) {
+static void menu_draw(const switch_mod *mods, int n, int sel, int top, bool dirty, const char *note) {
     char dir[600], p[900];
     mods_dir(dir, sizeof dir);
     printf("\x1b[2J\x1b[H");  // clear, home
@@ -294,12 +308,34 @@ static void menu_draw(const switch_mod *mods, int n, int sel, int top, const cha
     }
     if (n > MENU_ROWS) printf("      (%d-%d of %d)\n", top + 1, top + MENU_ROWS < n ? top + MENU_ROWS : n, n);
     int on = count_on(mods, n);
-    printf("\n%d of %d on%s\n\n", on, n, on == 0 ? ": the original game" : "");
+    printf("\n%d of %d on%s\n", on, n, on == 0 ? ": the original game" : "");
+    printf(dirty ? "Changed: + applies the changes and starts, X applies them now.\n\n" : "\n");
     printf("  Up/Down  choose            A  on/off\n"
            "  L / R    move up / down    -  all off (the original game)\n"
-           "  +        save and start    B  start without changes\n");
+           "  +        apply and start   X  apply now (always rebuilds ftl.dat)\n"
+           "  Y        settings          B  start without patching\n");
     if (note) printf("\n%s\n", note);
     consoleUpdate(NULL);
+}
+
+static void console_print(const char *line);
+
+// X in the mod list: applies the mods that are on now, changed or not (also when
+// ftl.dat was changed by hand), and says how it went
+static const char *apply_now(const switch_mod *mods, int n) {
+    static char note[1200];
+    printf("\x1b[2J\x1b[H");
+    LOGI("mods: applying now (the mod list's X)");
+    for (int i = 0, k = 0; i < n; i++)
+        if (mods[i].on) printf("  %d. %s\n", ++k, mods[i].name);
+    char err[1024];
+    if (switch_mods_apply(mods, n, console_print, err, sizeof err) != 0)
+        snprintf(note, sizeof note, "The mods couldn't be applied:\n%s\nThe original game is back.", err);
+    else if (count_on(mods, n) == 0)
+        snprintf(note, sizeof note, "The original game is back. Press + or B to start.");
+    else
+        snprintf(note, sizeof note, "Applied. Press + or B to start.");
+    return note;
 }
 
 bool switch_mods_menu(void) {
@@ -311,9 +347,9 @@ bool switch_mods_menu(void) {
     padInitializeDefault(&pad);
     padUpdate(&pad);  // L, held to get here, doesn't count
     int sel = 0, top = 0;
-    bool dirty = false;
+    bool dirty = false, applied = false;
     const char *note = NULL;
-    menu_draw(mods, n, sel, top, note);
+    menu_draw(mods, n, sel, top, dirty, note);
     while (appletMainLoop()) {
         padUpdate(&pad);
         u64 down = padGetButtonsDown(&pad);
@@ -345,24 +381,30 @@ bool switch_mods_menu(void) {
         } else if (down & HidNpadButton_Minus) {
             for (int i = 0; i < n; i++) mods[i].on = false;
             dirty = true;
-        } else if (down & HidNpadButton_Plus) {
-            if (!dirty) break;
-            if (switch_mods_save(mods, n) == 0) {
-                LOGI("mods: %d of %d on, saved to mods/order.txt", count_on(mods, n), n);
-                break;
+        } else if (down & (HidNpadButton_Plus | HidNpadButton_X)) {
+            if (dirty && switch_mods_save(mods, n) != 0) {
+                note = "Couldn't write mods/order.txt: is the SD card full or read-only?";
+            } else {
+                if (dirty) LOGI("mods: %d of %d on, saved to mods/order.txt", count_on(mods, n), n);
+                applied |= dirty;
+                dirty = false;
+                if (down & HidNpadButton_Plus) break;  // startup applies them
+                note = apply_now(mods, n);
             }
-            note = "Couldn't write mods/order.txt: is the SD card full or read-only?";
+        } else if (down & HidNpadButton_Y) {
+            char settings[700];
+            snprintf(settings, sizeof settings, "%s/settings.ini", g_paths.config_dir);
+            switch_settings_menu(settings, true);
         } else if (down & HidNpadButton_B) {
-            dirty = false;
-            break;
+            break;  // without what changed since the last + or X
         }
         if (sel < top) top = sel;
         if (sel >= top + MENU_ROWS) top = sel - MENU_ROWS + 1;
-        menu_draw(mods, n, sel, top, note);
+        menu_draw(mods, n, sel, top, dirty, note);
     }
     printf("\x1b[2J\x1b[H");
     consoleUpdate(NULL);
-    return dirty;
+    return applied;
 }
 
 // ftl.nro at startup: applies the mods that are on when they changed since last time.

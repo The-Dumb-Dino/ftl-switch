@@ -33,16 +33,25 @@ overlay mods need.
 ## The mod list
 
 When there are mods in `mods/`, FTL's start screen says "Press L for the mod
-list..." for a moment (a button held while FTL starts doesn't count: press it
-there). The list shows the mods and which are on:
+list, R for settings..." for a moment (a button held while FTL starts doesn't
+count: press it there, or keep pressing it while FTL starts). The list shows
+the mods and which are on:
 
     Up/Down  choose            A  on/off
     L / R    move up / down    -  all off (the original game)
-    +        save and start    B  start without changes
+    +        apply and start   X  apply now (always rebuilds ftl.dat)
+    Y        settings          B  start without patching
 
-`+` saves the choice to `mods/order.txt`, and FTL applies it right away when it
-changed. All off puts the original `ftl.dat` back (a copy, so it's quick), and
-the mods stay in the folder for later. Hyperspace stays first in the list.
+**+** saves the choice to `mods/order.txt`, applies it when it changed, and
+starts the game. **X** saves and applies right away and goes back to the list;
+it rebuilds `ftl.dat` even when nothing changed, for when `ftl.dat` was changed
+or replaced by hand. **B** starts without patching, leaving out what changed
+since the last + or X. **Y** opens the settings, as R does on the start screen.
+
+All off puts the original `ftl.dat` back (a copy, so it's quick), and the mods
+stay in the folder for later. Hyperspace stays first in the list. FTL also
+notices by itself when `ftl.dat` is the original game's again (for instance
+`ftl.dat.vanilla` renamed back) and applies the mods again.
 
 ## Very large mod sets: patch on a PC
 
