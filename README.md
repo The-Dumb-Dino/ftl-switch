@@ -55,6 +55,20 @@ Donations are never expected; Bug reports, logs, and well-written issues are
 just as valuable.
 
 
+## Switch footage
+### Menu
+<img width="640" height="482" alt="photo_9_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/5f4b9a23-c0d9-47d4-807f-58dc851af20b" />
+
+### Vanilla
+<img width="320" height="241" alt="photo_8_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/0a133a22-f42d-4f4e-a58e-c94c5fd1cb08" />
+<img width="320" height="241" alt="photo_7_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/106c491a-8b38-42b3-b3a9-a6132d96fa2f" />
+<img width="320" height="241" alt="photo_2_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/01a85718-b210-473b-9392-e970d30b4f24" />
+
+### FTL: Multiverse
+<img width="320" height="241" alt="photo_10_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/c62c141e-33c7-44d0-8dc5-06107992c334" />
+<img width="320" height="241" alt="photo_11_2026-11-03_07-52-09" src="https://github.com/user-attachments/assets/39d72185-4369-451e-93f0-6e1cc765f002" />
+
+
 ## Documentation
 
 | | |
