@@ -145,7 +145,9 @@ Please report bugs on GitHub and attach the session logs from
 there too).
 
 An empty file named `screenshot` in `sdmc:/switch/ftl/` saves the next frame as
-`screenshot.png` there, for showing what went wrong.
+`screenshot.png` there, for showing what went wrong. With Hyperspace, the top
+right corner shows which build it is (`HS-1.23.2 Switch <commit>`), as on PC;
+Hyperspace's "more info" setting hides it.
 
 ## Known limitations
 

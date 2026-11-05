@@ -25,7 +25,7 @@ which the script checks). Then:
     libcxx/build.sh switch      # libc++ with Apple's ABI, for newlib + libnx
     hyperspace/build-switch.sh  # optional: Hyperspace, linked in when built
     switch/rust/build-ftlman.sh # optional: ftlman's patch engine, linked in when built
-    IPA=FTL.ipa switch/build.sh # -> ~/ftl-build/switch/build/ftl.nro
+    switch/build.sh             # -> ~/ftl-build/switch/build/ftl.nro
 
 All output goes to `~/ftl-build/` (outside the repository).
 `HYPERSPACE= switch/build.sh` builds without Hyperspace, `FTLMAN=` without

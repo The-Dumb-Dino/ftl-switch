@@ -36,7 +36,13 @@ typedef struct hs_host_info
     int (*find_macho_unwind)(uintptr_t pc, uintptr_t *mh, uintptr_t *text_len, uintptr_t *compact_unwind,
                              size_t *compact_unwind_len, uintptr_t *eh_frame, size_t *eh_frame_len);
 
-    /* Optional (hosts may pass a smaller size without them): where code memory comes
+    /* Optional (hosts may pass a smaller size without them, and NULL to leave it out):
+       memory the port keeps free next to the game for the hook trampolines. The Android
+       app passes it; the Switch gives alloc_code below instead. */
+    void *hook_area;
+    size_t hook_area_size;
+
+    /* Optional: where code memory comes
        from on hosts that can't map or reprotect it themselves (the Switch). alloc_code
        returns size bytes of executable memory within +-128MB of the game, and
        write_code writes n bytes of code at dst (game or alloc_code memory) and makes
@@ -52,7 +58,7 @@ typedef struct hs_host_info
 } hs_host_info;
 
 /* The size of the interface before the optional fields */
-#define HS_HOST_INFO_SIZE_V1 offsetof(hs_host_info, alloc_code)
+#define HS_HOST_INFO_SIZE_V1 offsetof(hs_host_info, hook_area)
 
 /* Returns 0 once Hyperspace's hooks are in place. Otherwise writes the reason to
    error and returns nonzero; the game must not be started then, since some hooks may
