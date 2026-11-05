@@ -19,7 +19,7 @@ On Debian/Ubuntu the packages are `clang lld llvm cmake ninja-build python3
 python3-pil patch`, with Rust from [rustup](https://rustup.rs/).
 
 ftlman (`build-ftlman.sh` adds `rust-src`; std must use libc 0.2.191,
-which the script checks), and Pillow for the icon. Then:
+which the script checks). Then:
 
     switch/setup.sh             # once: devkitPro's target packages, elf2nro, nacptool
     libcxx/build.sh switch      # libc++ with Apple's ABI, for newlib + libnx
@@ -33,13 +33,12 @@ ftlman (then mods can only be patched on a PC).
 
 ## The icon
 
-`IPA=FTL.ipa switch/build.sh` (or an `.ipa` in `~/ftl-build/switch/`) gives
-`ftl.nro` the game's own icon for the Homebrew Menu: `tools/ipa_icon.py` takes
-the largest one in your `.ipa`'s asset catalog (the 1024×1024 App Store icon),
-decodes it (Apple's LZVN compression, in Python) and scales it to the 256×256
-JPEG an `.nro` carries (Pillow). It's made in the build folder only, so no game
-art is in the repository. `FTL_SWITCH_ICON=icon.jpg` uses your own JPEG
-instead.
+`ftl.nro` carries the game's own icon for the Homebrew Menu, `switch/icon.jpg`
+(Subset Games allows using FTL's art). It was made from the `.ipa` with
+`tools/ipa_icon.py FTL.ipa switch/icon.jpg`, which takes the largest icon in the
+app's asset catalog (the 1024×1024 App Store icon), decodes it (Apple's LZVN
+compression, in Python) and scales it to the 256×256 JPEG an `.nro` carries
+(Pillow). `FTL_SWITCH_ICON=icon.jpg switch/build.sh` uses another JPEG.
 
 ## Version string
 

@@ -1,9 +1,7 @@
 #!/bin/bash
 # Builds ftl.nro (Switch homebrew). Run switch/setup.sh once first.
 #   switch/build.sh            -> ~/ftl-build/switch/build/ftl.nro
-#   IPA=FTL.ipa switch/build.sh   the Homebrew Menu icon from your .ipa (made at build
-#                                  time, never committed; tools/ipa_icon.py, needs Pillow)
-#   FTL_SWITCH_ICON=icon.jpg switch/build.sh   or your own 256x256 JPEG
+#   FTL_SWITCH_ICON=icon.jpg switch/build.sh   another 256x256 JPEG than switch/icon.jpg
 #   with Hyperspace when hyperspace/build-switch.sh has built it, and ftlman (mods on the
 #   console) when switch/rust/build-ftlman.sh has
 #   RELEASE=1 switch/build.sh   a release: with the built-in updater, which offers newer
@@ -41,19 +39,8 @@ if [ -n "$FM" ] && [ -f "$FM" ]; then
   HS_ARGS+=(-DFTL_SWITCH_FTLMAN="$FM")
   echo "with ftlman from $FM"
 fi
-# The icon: FTL_SWITCH_ICON, else made from IPA (or an .ipa in $ROOT) into the build folder
+# The icon: switch/icon.jpg, or FTL_SWITCH_ICON=your.jpg (256x256)
 ICON=${FTL_SWITCH_ICON:-}
-if [ -z "$ICON" ]; then
-  IPA=${IPA:-$(ls "$ROOT"/*.ipa 2>/dev/null | head -1 || true)}
-  if [ -n "$IPA" ] && [ -f "$IPA" ]; then
-    mkdir -p "$BUILD"
-    if [ ! -f "$BUILD/icon.jpg" ] || [ "$IPA" -nt "$BUILD/icon.jpg" ]; then
-      python3 "$HERE/../tools/ipa_icon.py" "$IPA" "$BUILD/icon.jpg" || rm -f "$BUILD/icon.jpg"
-    fi
-    [ -f "$BUILD/icon.jpg" ] && ICON=$BUILD/icon.jpg
-  fi
-  [ -n "$ICON" ] || echo "note: no icon (IPA=FTL.ipa switch/build.sh makes one from your .ipa)"
-fi
 cmake -G Ninja -S "$HERE/../native" -B "$BUILD" -DCMAKE_TOOLCHAIN_FILE="$HERE/toolchain.cmake" \
   -DFTL_SWITCH_APP=ON -DCMAKE_BUILD_TYPE=Release -DLIBCXX_DIR="$LIBCXX" \
   -DFTL_SWITCH_VERSION="$VERSION" -DFTL_SWITCH_ICON="$ICON" -DFTL_SWITCH_UPDATE_REPO="$UPDATE_REPO" \

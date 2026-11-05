@@ -6,7 +6,7 @@
 Takes the largest AppIcon image in the app's asset catalog (Assets.car: the
 1024x1024 App Store icon for FTL), which CoreUI stores as premultiplied BGRA
 compressed with LZVN, decoded here in Python. Needs Pillow for scaling and the
-JPEG. The icon is game art: it's made at build time and never committed.
+JPEG. This made switch/icon.jpg (Subset Games allows using FTL's art).
 """
 import struct
 import sys

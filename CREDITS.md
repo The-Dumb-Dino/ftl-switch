@@ -3,9 +3,10 @@
 ## FTL
 
 FTL: Faster Than Light is made by [Subset Games](https://subsetgames.com/).
-This project contains nothing of the game: it runs your own copy of FTL for
-iPad, which you import from your own `.ipa`. It isn't affiliated with or
-endorsed by Subset Games, Apple or Nintendo.
+This project contains nothing of the game but its icon (`switch/icon.jpg`, for
+the Homebrew Menu; Subset Games allows using FTL's art): it runs your own copy
+of FTL for iPad, which you import from your own `.ipa`. It isn't affiliated
+with or endorsed by Subset Games, Apple or Nintendo.
 
 ## Based on ftl-android
 
@@ -35,8 +36,8 @@ New or changed in this project:
   `switch/`): the clang/lld toolchain for libnx, code memory under Horizon,
   touch, Joy-Cons, the keyboard and error applets, mods applied on the console
   with ftlman's engine (`switch/rust/`, `ftlman/switch.patch`), Hyperspace
-  linked in (its Switch target in the iPad fork, `buildscripts/switch/` there), the icon from your `.ipa`
-  (`tools/ipa_icon.py`)
+  linked in (its Switch target in the iPad fork, `buildscripts/switch/` there), the icon taken from the
+  `.ipa` (`tools/ipa_icon.py`)
 - settings.ini, importing the game from an `.ipa`, and the mod image overlay
   (`native/src/platform/linux/`, from the Linux version this port grew out of)
 - builds on aarch64 Linux hosts (the toolchain, libc++, the headless harness)

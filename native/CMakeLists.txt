@@ -129,11 +129,14 @@ if(FTL_SWITCH_APP)
     target_link_libraries(ftl PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/mesa-private.o ${CXX_LIBS} z)
     find_program(ELF2NRO elf2nro HINTS $ENV{HOME}/ftl-build/switch/tools ${DEVKITPRO}/tools/bin REQUIRED)
     find_program(NACPTOOL nacptool HINTS $ENV{HOME}/ftl-build/switch/tools ${DEVKITPRO}/tools/bin REQUIRED)
-    set(FTL_SWITCH_ICON "" CACHE FILEPATH "256x256 JPEG for the Homebrew Menu (optional; not in the repository)")
-    if(FTL_SWITCH_ICON)
-        set(_icon --icon=${FTL_SWITCH_ICON})
-        set(_icon_dep ${FTL_SWITCH_ICON})
+    # the game's icon from the .ipa (tools/ipa_icon.py), which Subset Games allows using
+    set(FTL_SWITCH_ICON "" CACHE FILEPATH "256x256 JPEG for the Homebrew Menu (default: switch/icon.jpg)")
+    set(_icon_file ${FTL_SWITCH_ICON})
+    if(NOT _icon_file)
+        set(_icon_file ${CMAKE_CURRENT_SOURCE_DIR}/../switch/icon.jpg)
     endif()
+    set(_icon --icon=${_icon_file})
+    set(_icon_dep ${_icon_file})
     # a relocation into read-only memory crashes ftl.nro on a console before main
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_custom_command(OUTPUT ftl.nro
