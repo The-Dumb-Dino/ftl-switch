@@ -138,7 +138,7 @@ if(FTL_SWITCH_APP)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_custom_command(OUTPUT ftl.nro
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../switch/check-relocs.py $<TARGET_FILE:ftl>
-        COMMAND ${NACPTOOL} --create "FTL: Faster Than Light" "FTL port (your own iPad copy)" "${FTL_SWITCH_VERSION}" ftl.nacp
+        COMMAND ${NACPTOOL} --create "FTL: Faster Than Light" "The Dumb Dino" "${FTL_SWITCH_VERSION}" ftl.nacp
         COMMAND ${ELF2NRO} $<TARGET_FILE:ftl> ftl.nro --nacp=ftl.nacp ${_icon}
         DEPENDS ftl ${_icon_dep} VERBATIM)
     add_custom_target(nro ALL DEPENDS ftl.nro)
