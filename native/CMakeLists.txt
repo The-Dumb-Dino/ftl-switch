@@ -49,7 +49,7 @@ if(FTL_SWITCH_APP)
     # Hyperspace, linked in (hyperspace/build-switch.sh): its library and the folder with
     # the Lua it was built with. Without it, ftl.nro has stubs and plays without Hyperspace.
     set(FTL_SWITCH_HYPERSPACE "" CACHE FILEPATH "libHyperspace.a built for the Switch (optional)")
-    set(FTL_SWITCH_HS_DEPS "" CACHE PATH "Its dependencies (lib/liblua.a)")
+    set(FTL_SWITCH_HS_DEPS "" CACHE PATH "Its dependencies (lib/liblua.a, lib/libSDL3.a)")
     # ftlman's patch engine, linked in (switch/rust/build-ftlman.sh): mods from /switch/ftl/mods/
     set(FTL_SWITCH_FTLMAN "" CACHE FILEPATH "libftlman_switch.a built for the Switch (optional)")
     # The built-in updater, for release builds only (RELEASE=1 switch/build.sh): the
@@ -105,6 +105,11 @@ if(FTL_SWITCH_APP)
         target_link_libraries(ftl PRIVATE -Wl,--whole-archive ${FTL_SWITCH_HYPERSPACE} -Wl,--no-whole-archive
             ${FTL_SWITCH_HS_DEPS}/lib/liblua.a
             ${DEVKITPRO}/portlibs/switch/lib/libminizip.a)
+        # SDL3 for Hyperspace's features (audio, controllers), from Hyperspace's build;
+        # Hyperspace from before it has none
+        if(EXISTS ${FTL_SWITCH_HS_DEPS}/lib/libSDL3.a)
+            target_link_libraries(ftl PRIVATE ${FTL_SWITCH_HS_DEPS}/lib/libSDL3.a)
+        endif()
     endif()
     target_include_directories(ftl PRIVATE include src)
     # newlib's stdatomic.h (which clang's defers to) uses stdint.h's types without including it

@@ -56,6 +56,7 @@ New or changed in this project:
 | [stb_image](https://github.com/nothings/stb) by Sean Barrett | PNG decoding (`native/src/third_party/`) | MIT or public domain |
 | [zlib](https://zlib.net/) | `ftl.dat` and `.ipa` reading (devkitPro's) | zlib |
 | Boost (headers), Lua 5.3, minizip | Hyperspace's dependencies | BSL-1.0, MIT, zlib |
+| [SDL 3.4](https://www.libsdl.org/), devkitPro's [Switch port](https://github.com/devkitPro/SDL/tree/switch-sdl-3.4) | Hyperspace's audio and controllers, built with it (its controller driver replaced by Hyperspace's) | zlib |
 | [libnx](https://github.com/switchbrew/libnx), devkitPro's newlib, mesa, zlib | The Switch build's system libraries, linked in | ISC; BSD-style; MIT; zlib |
 | The Rust standard library and ftlman's crates | ftlman's engine on the Switch | MIT / Apache-2.0 and others |
 
